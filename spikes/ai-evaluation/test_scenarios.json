@@ -1,0 +1,194 @@
+{
+  "description": "Golden dataset for AI model evaluation spike. Each scenario tests a different edge of the discipline evaluation engine.",
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "SC-001",
+      "name": "First offense tardiness",
+      "description": "Employee with no prior incidents arrives 25 minutes late. Should match verbal_warning rule.",
+      "incident": {
+        "type": "tardiness",
+        "severity": "medium",
+        "description": "Employee arrived 25 minutes late without prior notification",
+        "incident_date": "2026-03-15"
+      },
+      "employee": {
+        "name": "John Smith",
+        "prior_incidents": 0,
+        "has_active_pip": false
+      },
+      "policy_rules": [
+        {
+          "trigger": {"type": "tardiness"},
+          "conditions": [{"field": "prior_count", "operator": "eq", "value": 0}],
+          "action": {"type": "verbal_warning", "escalation_level": 1}
+        },
+        {
+          "trigger": {"type": "tardiness"},
+          "conditions": [{"field": "prior_count", "operator": "gte", "value": 1}],
+          "action": {"type": "written_warning", "escalation_level": 2}
+        }
+      ],
+      "expected": {
+        "matched_rule": "verbal_warning",
+        "escalation_level": 1,
+        "confidence_range": [85, 98]
+      }
+    },
+    {
+      "id": "SC-002",
+      "name": "Second offense tardiness — escalation",
+      "description": "Employee with one prior tardiness incident offends again. Should escalate to written_warning.",
+      "incident": {
+        "type": "tardiness",
+        "severity": "medium",
+        "description": "Employee arrived 40 minutes late. This is the second tardiness incident in 30 days.",
+        "incident_date": "2026-03-20"
+      },
+      "employee": {
+        "name": "Sarah Johnson",
+        "prior_incidents": 1,
+        "has_active_pip": false
+      },
+      "policy_rules": [
+        {
+          "trigger": {"type": "tardiness"},
+          "conditions": [{"field": "prior_count", "operator": "eq", "value": 0}],
+          "action": {"type": "verbal_warning", "escalation_level": 1}
+        },
+        {
+          "trigger": {"type": "tardiness"},
+          "conditions": [{"field": "prior_count", "operator": "gte", "value": 1}],
+          "action": {"type": "written_warning", "escalation_level": 2}
+        },
+        {
+          "trigger": {"type": "tardiness"},
+          "conditions": [
+            {"field": "prior_count", "operator": "gte", "value": 3}
+          ],
+          "action": {"type": "suspension", "escalation_level": 3}
+        }
+      ],
+      "expected": {
+        "matched_rule": "written_warning",
+        "escalation_level": 2,
+        "confidence_range": [88, 99]
+      }
+    },
+    {
+      "id": "SC-003",
+      "name": "Active PIP — enhanced scrutiny",
+      "description": "Employee with an active PIP commits a conduct violation. Should trigger PIP review escalation.",
+      "incident": {
+        "type": "insubordination",
+        "severity": "high",
+        "description": "Employee refused a direct, reasonable instruction from their supervisor during a team meeting.",
+        "incident_date": "2026-03-22"
+      },
+      "employee": {
+        "name": "Michael Chen",
+        "prior_incidents": 2,
+        "has_active_pip": true
+      },
+      "policy_rules": [
+        {
+          "trigger": {"type": "insubordination"},
+          "conditions": [{"field": "has_active_pip", "operator": "eq", "value": true}],
+          "action": {"type": "pip_review", "escalation_level": 4}
+        },
+        {
+          "trigger": {"type": "insubordination"},
+          "conditions": [{"field": "prior_count", "operator": "eq", "value": 0}],
+          "action": {"type": "written_warning", "escalation_level": 2}
+        },
+        {
+          "trigger": {"type": "insubordination"},
+          "conditions": [{"field": "prior_count", "operator": "gte", "value": 1}],
+          "action": {"type": "suspension", "escalation_level": 3}
+        }
+      ],
+      "expected": {
+        "matched_rule": "pip_review",
+        "escalation_level": 4,
+        "confidence_range": [90, 99]
+      }
+    },
+    {
+      "id": "SC-004",
+      "name": "No matching policy rule",
+      "description": "An incident type that does not match any configured policy rule. Should return no_action with low confidence.",
+      "incident": {
+        "type": "dress_code",
+        "severity": "low",
+        "description": "Employee wore casual attire on a day with no client meetings, violating the updated dress code policy.",
+        "incident_date": "2026-03-25"
+      },
+      "employee": {
+        "name": "Emily Davis",
+        "prior_incidents": 0,
+        "has_active_pip": false
+      },
+      "policy_rules": [
+        {
+          "trigger": {"type": "tardiness"},
+          "conditions": [{"field": "prior_count", "operator": "eq", "value": 0}],
+          "action": {"type": "verbal_warning", "escalation_level": 1}
+        },
+        {
+          "trigger": {"type": "insubordination"},
+          "conditions": [{"field": "prior_count", "operator": "eq", "value": 0}],
+          "action": {"type": "written_warning", "escalation_level": 2}
+        }
+      ],
+      "expected": {
+        "matched_rule": "no_action",
+        "escalation_level": 0,
+        "confidence_range": [60, 85]
+      }
+    },
+    {
+      "id": "SC-005",
+      "name": "Performance issue — recurring pattern",
+      "description": "Multiple performance incidents over a quarter. Should trigger PIP consideration.",
+      "incident": {
+        "type": "performance",
+        "severity": "high",
+        "description": "Employee missed quarterly sales target by 45% for the second consecutive quarter. KPIs below minimum threshold.",
+        "incident_date": "2026-03-28"
+      },
+      "employee": {
+        "name": "Robert Martinez",
+        "prior_incidents": 4,
+        "has_active_pip": false
+      },
+      "policy_rules": [
+        {
+          "trigger": {"type": "performance"},
+          "conditions": [
+            {"field": "prior_count", "operator": "gte", "value": 3},
+            {"field": "severity", "operator": "eq", "value": "high"}
+          ],
+          "action": {"type": "pip_review", "escalation_level": 4}
+        },
+        {
+          "trigger": {"type": "performance"},
+          "conditions": [{"field": "prior_count", "operator": "lt", "value": 3}],
+          "action": {"type": "written_warning", "escalation_level": 2}
+        },
+        {
+          "trigger": {"type": "performance"},
+          "conditions": [
+            {"field": "has_active_pip", "operator": "eq", "value": true},
+            {"field": "prior_count", "operator": "gte", "value": 1}
+          ],
+          "action": {"type": "termination", "escalation_level": 5}
+        }
+      ],
+      "expected": {
+        "matched_rule": "pip_review",
+        "escalation_level": 4,
+        "confidence_range": [85, 97]
+      }
+    }
+  ]
+}

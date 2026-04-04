@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   AI HR Platform — Global Styles
+   ============================================ */
+
+@layer base {
+  /* Root element: dark background, font defaults */
+  html {
+    @apply bg-page font-body text-text-primary antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-page text-text-primary;
+  }
+
+  /* Headings use Playfair Display */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+
+  /* Selection highlight uses brand primary */
+  ::selection {
+    @apply bg-brand-primary text-text-inverse;
+  }
+
+  /* Dark scrollbar for Webkit browsers */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-brand-dark-slate;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-brand-slate-light;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-slate-lighter;
+  }
+
+  /* Focus ring matches brand primary */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-primary;
+  }
+}
+
+@layer components {
+  /* Card base style */
+  .card {
+    @apply rounded-2xl border border-border bg-card p-6 shadow-lg;
+  }
+}

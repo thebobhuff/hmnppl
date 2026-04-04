@@ -1,0 +1,683 @@
+{
+  "meta": {
+    "timestamp": "2026-03-30T01:02:31.780Z",
+    "dry_run": true,
+    "models_evaluated": [
+      "openai/gpt-4o-mini",
+      "meta-llama/llama-3-70b-instruct",
+      "mistralai/mistral-7b-instruct"
+    ],
+    "scenario_count": 5
+  },
+  "model_summaries": [
+    {
+      "model": "openai/gpt-4o-mini",
+      "display_name": "GPT-4o Mini",
+      "total_calls": 5,
+      "errors": 0,
+      "avg_latency_ms": 925.4,
+      "min_latency_ms": 860,
+      "max_latency_ms": 971,
+      "avg_quality_score": 100,
+      "total_cost_usd": 0.000467,
+      "avg_cost_per_call_usd": 0.000093,
+      "cost_per_1k_input": 0.00015,
+      "cost_per_1k_output": 0.0006
+    },
+    {
+      "model": "meta-llama/llama-3-70b-instruct",
+      "display_name": "Llama 3 70B",
+      "total_calls": 5,
+      "errors": 0,
+      "avg_latency_ms": 1081.6,
+      "min_latency_ms": 1005,
+      "max_latency_ms": 1158,
+      "avg_quality_score": 100,
+      "total_cost_usd": 0.001209,
+      "avg_cost_per_call_usd": 0.000242,
+      "cost_per_1k_input": 0.00065,
+      "cost_per_1k_output": 0.0008
+    },
+    {
+      "model": "mistralai/mistral-7b-instruct",
+      "display_name": "Mistral 7B",
+      "total_calls": 5,
+      "errors": 0,
+      "avg_latency_ms": 643.4,
+      "min_latency_ms": 532,
+      "max_latency_ms": 692,
+      "avg_quality_score": 43,
+      "total_cost_usd": 0.000095,
+      "avg_cost_per_call_usd": 0.000019,
+      "cost_per_1k_input": 0.00005,
+      "cost_per_1k_output": 0.00008
+    }
+  ],
+  "scenario_results": [
+    {
+      "scenario_id": "SC-001",
+      "scenario_name": "First offense tardiness",
+      "expected": {
+        "matched_rule": "verbal_warning",
+        "escalation_level": 1,
+        "confidence_range": [
+          85,
+          98
+        ]
+      },
+      "model_results": [
+        {
+          "model": "openai/gpt-4o-mini",
+          "latency_ms": 971,
+          "cost_usd": 0.000097,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "verbal_warning",
+              "actual_rule": "verbal_warning",
+              "expected_level": 1,
+              "actual_level": 1,
+              "expected_confidence_range": [
+                85,
+                98
+              ],
+              "actual_confidence": 85
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "verbal_warning",
+            "escalation_level": 1,
+            "action_type": "verbal_warning",
+            "confidence": 85,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-001",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 245,
+            "completion_tokens": 100,
+            "total_tokens": 345
+          }
+        },
+        {
+          "model": "meta-llama/llama-3-70b-instruct",
+          "latency_ms": 1005,
+          "cost_usd": 0.000257,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "verbal_warning",
+              "actual_rule": "verbal_warning",
+              "expected_level": 1,
+              "actual_level": 1,
+              "expected_confidence_range": [
+                85,
+                98
+              ],
+              "actual_confidence": 93
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "verbal_warning",
+            "escalation_level": 1,
+            "action_type": "verbal_warning",
+            "confidence": 93,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-001",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 280,
+            "completion_tokens": 94,
+            "total_tokens": 374
+          }
+        },
+        {
+          "model": "mistralai/mistral-7b-instruct",
+          "latency_ms": 532,
+          "cost_usd": 0.000017,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": false,
+            "quality_score": 85,
+            "details": {
+              "expected_rule": "verbal_warning",
+              "actual_rule": "verbal_warning",
+              "expected_level": 1,
+              "actual_level": 1,
+              "expected_confidence_range": [
+                85,
+                98
+              ],
+              "actual_confidence": 59
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "verbal_warning",
+            "escalation_level": 1,
+            "action_type": "verbal_warning",
+            "confidence": 59,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-001",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 224,
+            "completion_tokens": 73,
+            "total_tokens": 297
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "SC-002",
+      "scenario_name": "Second offense tardiness — escalation",
+      "expected": {
+        "matched_rule": "written_warning",
+        "escalation_level": 2,
+        "confidence_range": [
+          88,
+          99
+        ]
+      },
+      "model_results": [
+        {
+          "model": "openai/gpt-4o-mini",
+          "latency_ms": 914,
+          "cost_usd": 0.000088,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "written_warning",
+              "actual_rule": "written_warning",
+              "expected_level": 2,
+              "actual_level": 2,
+              "expected_confidence_range": [
+                88,
+                99
+              ],
+              "actual_confidence": 96
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "written_warning",
+            "escalation_level": 2,
+            "action_type": "written_warning",
+            "confidence": 96,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-002",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 248,
+            "completion_tokens": 84,
+            "total_tokens": 332
+          }
+        },
+        {
+          "model": "meta-llama/llama-3-70b-instruct",
+          "latency_ms": 1132,
+          "cost_usd": 0.000253,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "written_warning",
+              "actual_rule": "written_warning",
+              "expected_level": 2,
+              "actual_level": 2,
+              "expected_confidence_range": [
+                88,
+                99
+              ],
+              "actual_confidence": 94
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "written_warning",
+            "escalation_level": 2,
+            "action_type": "written_warning",
+            "confidence": 94,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-002",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 276,
+            "completion_tokens": 92,
+            "total_tokens": 368
+          }
+        },
+        {
+          "model": "mistralai/mistral-7b-instruct",
+          "latency_ms": 680,
+          "cost_usd": 0.000021,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": false,
+            "quality_score": 85,
+            "details": {
+              "expected_rule": "written_warning",
+              "actual_rule": "written_warning",
+              "expected_level": 2,
+              "actual_level": 2,
+              "expected_confidence_range": [
+                88,
+                99
+              ],
+              "actual_confidence": 58
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "written_warning",
+            "escalation_level": 2,
+            "action_type": "written_warning",
+            "confidence": 58,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-002",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 289,
+            "completion_tokens": 87,
+            "total_tokens": 376
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "SC-003",
+      "scenario_name": "Active PIP — enhanced scrutiny",
+      "expected": {
+        "matched_rule": "pip_review",
+        "escalation_level": 4,
+        "confidence_range": [
+          90,
+          99
+        ]
+      },
+      "model_results": [
+        {
+          "model": "openai/gpt-4o-mini",
+          "latency_ms": 955,
+          "cost_usd": 0.000098,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "pip_review",
+              "actual_rule": "pip_review",
+              "expected_level": 4,
+              "actual_level": 4,
+              "expected_confidence_range": [
+                90,
+                99
+              ],
+              "actual_confidence": 90
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "pip_review",
+            "escalation_level": 4,
+            "action_type": "pip_review",
+            "confidence": 90,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-003",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 260,
+            "completion_tokens": 99,
+            "total_tokens": 359
+          }
+        },
+        {
+          "model": "meta-llama/llama-3-70b-instruct",
+          "latency_ms": 1158,
+          "cost_usd": 0.000223,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "pip_review",
+              "actual_rule": "pip_review",
+              "expected_level": 4,
+              "actual_level": 4,
+              "expected_confidence_range": [
+                90,
+                99
+              ],
+              "actual_confidence": 93
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "pip_review",
+            "escalation_level": 4,
+            "action_type": "pip_review",
+            "confidence": 93,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-003",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 255,
+            "completion_tokens": 71,
+            "total_tokens": 326
+          }
+        },
+        {
+          "model": "mistralai/mistral-7b-instruct",
+          "latency_ms": 632,
+          "cost_usd": 0.000017,
+          "quality": {
+            "rule_match": false,
+            "level_match": false,
+            "confidence_in_range": false,
+            "quality_score": 10,
+            "details": {
+              "expected_rule": "pip_review",
+              "actual_rule": "verbal_warning",
+              "expected_level": 4,
+              "actual_level": 1,
+              "expected_confidence_range": [
+                90,
+                99
+              ],
+              "actual_confidence": 74
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "verbal_warning",
+            "escalation_level": 1,
+            "action_type": "verbal_warning",
+            "confidence": 74,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-003",
+            "policy_rule_index": -1
+          },
+          "tokens": {
+            "prompt_tokens": 224,
+            "completion_tokens": 72,
+            "total_tokens": 296
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "SC-004",
+      "scenario_name": "No matching policy rule",
+      "expected": {
+        "matched_rule": "no_action",
+        "escalation_level": 0,
+        "confidence_range": [
+          60,
+          85
+        ]
+      },
+      "model_results": [
+        {
+          "model": "openai/gpt-4o-mini",
+          "latency_ms": 860,
+          "cost_usd": 0.000094,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "no_action",
+              "actual_rule": "no_action",
+              "expected_level": 0,
+              "actual_level": 0,
+              "expected_confidence_range": [
+                60,
+                85
+              ],
+              "actual_confidence": 84
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "no_action",
+            "escalation_level": 0,
+            "action_type": "no_action",
+            "confidence": 84,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-004",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 276,
+            "completion_tokens": 88,
+            "total_tokens": 364
+          }
+        },
+        {
+          "model": "meta-llama/llama-3-70b-instruct",
+          "latency_ms": 1106,
+          "cost_usd": 0.000235,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "no_action",
+              "actual_rule": "no_action",
+              "expected_level": 0,
+              "actual_level": 0,
+              "expected_confidence_range": [
+                60,
+                85
+              ],
+              "actual_confidence": 75
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "no_action",
+            "escalation_level": 0,
+            "action_type": "no_action",
+            "confidence": 75,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-004",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 265,
+            "completion_tokens": 79,
+            "total_tokens": 344
+          }
+        },
+        {
+          "model": "mistralai/mistral-7b-instruct",
+          "latency_ms": 681,
+          "cost_usd": 0.000019,
+          "quality": {
+            "rule_match": false,
+            "level_match": false,
+            "confidence_in_range": true,
+            "quality_score": 25,
+            "details": {
+              "expected_rule": "no_action",
+              "actual_rule": "verbal_warning",
+              "expected_level": 0,
+              "actual_level": 1,
+              "expected_confidence_range": [
+                60,
+                85
+              ],
+              "actual_confidence": 62
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "verbal_warning",
+            "escalation_level": 1,
+            "action_type": "verbal_warning",
+            "confidence": 62,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-004",
+            "policy_rule_index": -1
+          },
+          "tokens": {
+            "prompt_tokens": 247,
+            "completion_tokens": 89,
+            "total_tokens": 336
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "SC-005",
+      "scenario_name": "Performance issue — recurring pattern",
+      "expected": {
+        "matched_rule": "pip_review",
+        "escalation_level": 4,
+        "confidence_range": [
+          85,
+          97
+        ]
+      },
+      "model_results": [
+        {
+          "model": "openai/gpt-4o-mini",
+          "latency_ms": 927,
+          "cost_usd": 0.00009,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "pip_review",
+              "actual_rule": "pip_review",
+              "expected_level": 4,
+              "actual_level": 4,
+              "expected_confidence_range": [
+                85,
+                97
+              ],
+              "actual_confidence": 94
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "pip_review",
+            "escalation_level": 4,
+            "action_type": "pip_review",
+            "confidence": 94,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-005",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 270,
+            "completion_tokens": 83,
+            "total_tokens": 353
+          }
+        },
+        {
+          "model": "meta-llama/llama-3-70b-instruct",
+          "latency_ms": 1007,
+          "cost_usd": 0.000241,
+          "quality": {
+            "rule_match": true,
+            "level_match": true,
+            "confidence_in_range": true,
+            "quality_score": 100,
+            "details": {
+              "expected_rule": "pip_review",
+              "actual_rule": "pip_review",
+              "expected_level": 4,
+              "actual_level": 4,
+              "expected_confidence_range": [
+                85,
+                97
+              ],
+              "actual_confidence": 96
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "pip_review",
+            "escalation_level": 4,
+            "action_type": "pip_review",
+            "confidence": 96,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-005",
+            "policy_rule_index": 0
+          },
+          "tokens": {
+            "prompt_tokens": 264,
+            "completion_tokens": 87,
+            "total_tokens": 351
+          }
+        },
+        {
+          "model": "mistralai/mistral-7b-instruct",
+          "latency_ms": 692,
+          "cost_usd": 0.00002,
+          "quality": {
+            "rule_match": false,
+            "level_match": false,
+            "confidence_in_range": false,
+            "quality_score": 10,
+            "details": {
+              "expected_rule": "pip_review",
+              "actual_rule": "verbal_warning",
+              "expected_level": 4,
+              "actual_level": 1,
+              "expected_confidence_range": [
+                85,
+                97
+              ],
+              "actual_confidence": 59
+            }
+          },
+          "parsed_response": {
+            "matched_rule": "verbal_warning",
+            "escalation_level": 1,
+            "action_type": "verbal_warning",
+            "confidence": 59,
+            "reasoning": "[DRY-RUN] Mock response for scenario SC-005",
+            "policy_rule_index": -1
+          },
+          "tokens": {
+            "prompt_tokens": 258,
+            "completion_tokens": 84,
+            "total_tokens": 342
+          }
+        }
+      ]
+    }
+  ],
+  "production_cost_estimates": {
+    "assumptions": {
+      "incidents_per_month": 100,
+      "documents_per_month": 50,
+      "document_cost_multiplier": 2
+    },
+    "estimates": [
+      {
+        "model": "GPT-4o Mini",
+        "monthly_eval_cost_usd": 0.0093,
+        "monthly_doc_cost_usd": 0.0093,
+        "monthly_total_usd": 0.0186,
+        "annual_total_usd": 0.22
+      },
+      {
+        "model": "Llama 3 70B",
+        "monthly_eval_cost_usd": 0.0242,
+        "monthly_doc_cost_usd": 0.0242,
+        "monthly_total_usd": 0.0484,
+        "annual_total_usd": 0.58
+      },
+      {
+        "model": "Mistral 7B",
+        "monthly_eval_cost_usd": 0.0019,
+        "monthly_doc_cost_usd": 0.0019,
+        "monthly_total_usd": 0.0038,
+        "annual_total_usd": 0.05
+      }
+    ]
+  }
+}
