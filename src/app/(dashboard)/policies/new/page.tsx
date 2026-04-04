@@ -628,7 +628,8 @@ function Step3AISettings({
               Allow Employee Disputes
             </p>
             <p className="text-xs text-text-tertiary">
-              Show a "Dispute" button on the document signing screen for employees.
+              Show a &quot;Dispute&quot; button on the document signing screen for
+              employees.
             </p>
           </div>
           <Switch checked={allowDisputes} onCheckedChange={onAllowDisputesChange} />
