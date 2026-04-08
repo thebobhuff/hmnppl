@@ -299,12 +299,17 @@ function IncidentCardItem({ incident }: { incident: IncidentCard }) {
 
           {(incident.status === "pending_hr_review" ||
             incident.status === "ai_evaluating") && (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/incident-queue/${incident.id}/review`}>
-                Review
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="ghost">
+                <Link href={`/incident-queue/${incident.id}`}>View</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/incident-queue/${incident.id}/review`}>
+                  Review
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
           )}
         </div>
       </div>

@@ -10,7 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Calendar, Clock, Users, Link2, FileText } from "lucide-react";
+import { Calendar, Clock, Users, Link2, FileText, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 const MOCK_MEETINGS = [
   {
@@ -99,6 +100,12 @@ export default function MeetingsPage() {
                         {meeting.type}
                       </Badge>
                     </div>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={`/meetings/${meeting.id}`}>
+                        View
+                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
                   </div>
                   <div className="mt-3 space-y-1.5 text-xs text-text-tertiary">
                     <div className="flex items-center gap-1.5">

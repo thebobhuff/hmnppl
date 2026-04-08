@@ -204,6 +204,9 @@ export const usersAPI = {
     return request<UserListResponse>(`/users?${qs.toString()}`);
   },
   get: (id: string) => request<{ user: UserResponse }>(`/users/${id}`),
+  getMyEmployees: () => request<{ employees: UserResponse[] }>(`/users/me/employees`),
+  getMyDocuments: () =>
+    request<{ documents: EmployeeDocumentItem[] }>(`/users/me/documents`),
   invite: (body: {
     email: string;
     role: string;
@@ -221,6 +224,50 @@ export const usersAPI = {
     }),
   timeline: (id: string) =>
     request<{ timeline: TimelineEvent[] }>(`/users/${id}/timeline`),
+};
+
+// ---------------------------------------------------------------------------
+// Departments
+// ---------------------------------------------------------------------------
+
+export const departmentsAPI = {
+  list: () => request<{ departments: DepartmentResponse[] }>(`/departments`),
+  create: (body: { name: string; head_id?: string | null }) =>
+    request<{ department: DepartmentResponse }>(`/departments`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  update: (id: string, body: { name: string; head_id?: string | null }) =>
+    request<{ department: DepartmentResponse }>(`/departments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  delete: (id: string, body?: { reassign_to_department_id?: string | null }) =>
+    request(`/departments/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify(body ?? {}),
+    }),
+};
+
+// ---------------------------------------------------------------------------
+// Company Settings
+// ---------------------------------------------------------------------------
+
+export const companySettingsAPI = {
+  get: () => request<{ company: CompanySettingsResponse }>(`/companies/settings`),
+  update: (body: Record<string, unknown>) =>
+    request<{ company: CompanySettingsResponse }>(`/companies/settings`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+};
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export const dashboardAPI = {
+  getSummary: () => request<{ summary: DashboardSummaryResponse }>(`/dashboard/summary`),
 };
 
 // ---------------------------------------------------------------------------
@@ -413,6 +460,108 @@ export interface TimelineEvent {
   status: string;
   entity_id: string;
 }
+
+export interface DepartmentResponse {
+  id: string;
+  company_id: string;
+  name: string;
+  head_id: string | null;
+  employee_count?: number;
+  head?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanySettingsResponse {
+  id: string;
+  name: string;
+  industry: string | null;
+  size: string | null;
+  country: string | null;
+  region: string | null;
+  subscription_tier: string;
+  ai_confidence_threshold: number;
+  dispute_enabled: boolean;
+  onboarding_completed: boolean;
+  onboarding_step: number | null;
+  settings: {
+    notification_prefs?: Record<string, unknown>;
+    feature_flags?: Record<string, boolean>;
+    ai_monthly_budget_usd?: number;
+    contacts?: {
+      hr_email?: string;
+      legal_email?: string;
+    };
+    location?: {
+      primary_location?: string;
+      state_jurisdiction?: string;
+    };
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DashboardSummaryResponse {
+  myEmployeesCount: number;
+  myReportsCount: number;
+  myOpenReportsCount: number;
+  employeePendingDocumentsCount: number;
+  employeeSignedDocumentsCount: number;
+  companyTotalEmployees: number;
+  activePoliciesCount: number;
+  openIncidentsCount: number;
+  aiConfidencePercent: number | null;
+  pendingReviewsCount: number;
+  aiEvaluatingCount: number;
+  meetingsTodayCount: number;
+  awaitingSignatureCount: number;
+  recentReports: DashboardReportItem[];
+  pendingReviews: DashboardReviewItem[];
+  upcomingMeetings: DashboardMeetingItem[];
+  pendingDocuments: DashboardEmployeeDocumentItem[];
+}
+
+export interface DashboardReportItem {
+  id: string;
+  reference: string;
+  employeeName: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface DashboardReviewItem {
+  id: string;
+  employeeName: string;
+  type: string;
+  severity: string;
+  confidence: number | null;
+  createdAt: string;
+}
+
+export interface DashboardMeetingItem {
+  id: string;
+  title: string;
+  type: string;
+  scheduledAt: string | null;
+  participantSummary: string;
+}
+
+export interface EmployeeDocumentItem {
+  id: string;
+  title: string;
+  type: string;
+  status: "pending_signature" | "signed" | "disputed";
+  reference: string;
+  createdAt: string;
+  signedAt: string | null;
+}
+
+export type DashboardEmployeeDocumentItem = EmployeeDocumentItem;
 
 export interface AIProxyResponse {
   success: boolean;

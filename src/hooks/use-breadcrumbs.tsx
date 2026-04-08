@@ -57,8 +57,10 @@ export function useBreadcrumbs() {
 export function usePageBreadcrumbs(items: BreadcrumbItem[]) {
   const { setBreadcrumbs } = useBreadcrumbs();
 
+  const itemsJson = JSON.stringify(items);
+
   useEffect(() => {
     setBreadcrumbs(items);
     return () => setBreadcrumbs([]);
-  }, [items, setBreadcrumbs]);
+  }, [itemsJson, setBreadcrumbs]);
 }

@@ -52,7 +52,13 @@ const COMPANY_ADMIN_NAV: NavItem[] = [
     href: "/dashboard",
     iconName: "LayoutDashboard",
   },
-  { key: "team", label: "Team", href: "/team", iconName: "Users" },
+  {
+    key: "departments",
+    label: "Departments",
+    href: "/departments",
+    iconName: "Building2",
+  },
+  { key: "employees", label: "Employees", href: "/employees", iconName: "Users" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
   { key: "reports", label: "Reports", href: "/reports", iconName: "BarChart3" },
   {
@@ -78,8 +84,14 @@ const HR_AGENT_NAV: NavItem[] = [
     iconName: "Inbox",
     badge: 0,
   },
-  { key: "meetings", label: "Meetings", href: "/meetings", iconName: "Calendar" },
   { key: "employees", label: "Employees", href: "/employees", iconName: "Users" },
+  {
+    key: "departments",
+    label: "Departments",
+    href: "/departments",
+    iconName: "Building2",
+  },
+  { key: "meetings", label: "Meetings", href: "/meetings", iconName: "Calendar" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
   {
     key: "my-reports",
@@ -103,6 +115,13 @@ const MANAGER_NAV: NavItem[] = [
     href: "/report-issue",
     iconName: "PlusCircle",
     isCta: true,
+  },
+  { key: "employees", label: "Employees", href: "/employees", iconName: "Users" },
+  {
+    key: "conduct-interview",
+    label: "Conduct Interview",
+    href: "/conduct-interview",
+    iconName: "MessageSquare",
   },
   {
     key: "my-reports",
