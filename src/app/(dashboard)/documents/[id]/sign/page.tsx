@@ -18,7 +18,14 @@ import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalTitle,
+  ModalDescription,
+  ModalFooter,
+} from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -455,22 +462,25 @@ export default function DocumentSigningPage({
 
       {/* Confirm Sign Modal */}
       <Modal open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-text-primary">Confirm Signature</h3>
-          <p className="text-sm text-text-secondary">
-            This signature is legally binding under the ESIGN Act and UETA. By confirming,
-            you acknowledge that:
-          </p>
-          <ul className="list-inside space-y-1 text-sm text-text-secondary">
-            <li>• You have read and understood this document</li>
-            <li>• You consent to electronic signature</li>
-            <li>
-              • Your signature will be recorded with timestamp, IP address, and device
-              information
-            </li>
-          </ul>
-          <div className="flex justify-end gap-2">
+        <ModalContent size="md">
+          <ModalHeader>
+            <ModalTitle>Confirm Signature</ModalTitle>
+            <ModalDescription>
+              This signature is legally binding under the ESIGN Act and UETA. By
+              confirming, you acknowledge that:
+            </ModalDescription>
+          </ModalHeader>
+          <div className="space-y-2 py-2">
+            <ul className="list-inside space-y-1 text-sm text-text-secondary">
+              <li>• You have read and understood this document</li>
+              <li>• You consent to electronic signature</li>
+              <li>
+                • Your signature will be recorded with timestamp, IP address, and device
+                information
+              </li>
+            </ul>
+          </div>
+          <ModalFooter>
             <Button variant="outline" onClick={() => setConfirmModalOpen(false)}>
               Cancel
             </Button>
@@ -478,20 +488,21 @@ export default function DocumentSigningPage({
               <CheckCircle className="mr-1.5 h-4 w-4" />
               Confirm & Sign
             </Button>
-          </div>
-        </div>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
 
       {/* Dispute Modal */}
       <Modal open={disputeModalOpen} onOpenChange={setDisputeModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-text-primary">Dispute Document</h3>
-          <p className="text-sm text-text-secondary">
-            If you disagree with the contents of this document, you may submit a dispute.
-            HR will review your dispute and respond within 5 business days.
-          </p>
-          <div className="space-y-3">
+        <ModalContent size="md">
+          <ModalHeader>
+            <ModalTitle>Dispute Document</ModalTitle>
+            <ModalDescription>
+              If you disagree with the contents of this document, you may submit a
+              dispute. HR will review your dispute and respond within 5 business days.
+            </ModalDescription>
+          </ModalHeader>
+          <div className="space-y-3 py-2">
             <div>
               <label className="block text-sm font-medium text-text-primary">
                 Reason for Dispute <span className="text-brand-error">*</span>
@@ -509,20 +520,20 @@ export default function DocumentSigningPage({
                 {disputeReason.length}/2000 (minimum 50 characters)
               </p>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDisputeModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleDispute}
-                disabled={disputeReason.length < 50}
-              >
-                Submit Dispute
-              </Button>
-            </div>
           </div>
-        </div>
+          <ModalFooter>
+            <Button variant="outline" onClick={() => setDisputeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleDispute}
+              disabled={disputeReason.length < 50}
+            >
+              Submit Dispute
+            </Button>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
     </PageContainer>
   );

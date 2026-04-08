@@ -6,11 +6,12 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { BreadcrumbProvider } from "@/hooks/use-breadcrumbs";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { AIAssistantPanel, AIAssistantFAB } from "@/components/domain/AIAssistantPanel";
 
 /**
  * Authenticated app shell.
@@ -35,6 +36,7 @@ import { Header } from "./Header";
 export function Shell({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const loginAs = useAuthStore((s) => s.loginAs);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // Auto-login for development (will be replaced by Supabase auth guard)
   useEffect(() => {
@@ -49,6 +51,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <Header />
         {children}
+
+        {/* AI Assistant */}
+        <AIAssistantPanel isOpen={panelOpen} onClose={() => setPanelOpen(false)} />
+        <AIAssistantFAB onClick={() => setPanelOpen(true)} />
       </div>
     </BreadcrumbProvider>
   );

@@ -6,71 +6,63 @@
  */
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, CheckCircle, Clock, AlertTriangle, ArrowRight } from "lucide-react";
 import Link from "next/link";
-
-interface DocumentItem {
-  id: string;
-  title: string;
-  type: string;
-  status: "pending_signature" | "signed" | "disputed";
-  dueDate?: string;
-  signedAt?: string;
-  reference: string;
-}
-
-const MOCK_DOCUMENTS: DocumentItem[] = [
-  {
-    id: "1",
-    title: "Written Warning — Attendance Policy",
-    type: "Written Warning",
-    status: "pending_signature",
-    dueDate: "Apr 7, 2026",
-    reference: "INC-2026-0042",
-  },
-  {
-    id: "2",
-    title: "Verbal Warning — Workplace Conduct",
-    type: "Verbal Warning",
-    status: "signed",
-    signedAt: "Mar 10, 2026",
-    reference: "INC-2026-0028",
-  },
-  {
-    id: "3",
-    title: "Meeting Summary — Quarterly Review",
-    type: "Meeting Summary",
-    status: "signed",
-    signedAt: "Feb 15, 2026",
-    reference: "MTG-2026-0005",
-  },
-];
+import { usersAPI, type EmployeeDocumentItem } from "@/lib/api/client";
 
 export default function DocumentsPage() {
-  const breadcrumbs = usePageBreadcrumbs([
-    { label: "Home", href: "/dashboard" },
-    { label: "My Documents" },
-  ]);
+  usePageBreadcrumbs([{ label: "Home", href: "/dashboard" }, { label: "My Documents" }]);
+
+  const [documents, setDocuments] = useState<EmployeeDocumentItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const pendingDocs = useMemo(
-    () => MOCK_DOCUMENTS.filter((d) => d.status === "pending_signature"),
-    [],
+    () => documents.filter((d) => d.status === "pending_signature"),
+    [documents],
   );
   const signedDocs = useMemo(
-    () => MOCK_DOCUMENTS.filter((d) => d.status === "signed"),
-    [],
+    () => documents.filter((d) => d.status === "signed"),
+    [documents],
   );
   const disputedDocs = useMemo(
-    () => MOCK_DOCUMENTS.filter((d) => d.status === "disputed"),
-    [],
+    () => documents.filter((d) => d.status === "disputed"),
+    [documents],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDocuments() {
+      try {
+        const data = await usersAPI.getMyDocuments();
+        if (!cancelled) {
+          setDocuments(data.documents);
+        }
+      } catch {
+        if (!cancelled) {
+          setDocuments([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadDocuments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <PageContainer
@@ -88,7 +80,15 @@ export default function DocumentsPage() {
             )}
           </h2>
 
-          {pendingDocs.length === 0 ? (
+          {loading && (
+            <div className="grid gap-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 rounded-lg" />
+              ))}
+            </div>
+          )}
+
+          {!loading && pendingDocs.length === 0 ? (
             <Card className="p-6">
               <EmptyState
                 title="All caught up!"
@@ -96,17 +96,17 @@ export default function DocumentsPage() {
                 icon={<CheckCircle className="h-8 w-8 text-brand-success" />}
               />
             </Card>
-          ) : (
+          ) : !loading ? (
             <div className="grid gap-3">
               {pendingDocs.map((doc) => (
                 <DocumentCard key={doc.id} doc={doc} />
               ))}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Disputed Documents */}
-        {disputedDocs.length > 0 && (
+        {!loading && disputedDocs.length > 0 && (
           <div>
             <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
               <AlertTriangle className="h-5 w-5 text-brand-error" />
@@ -128,7 +128,15 @@ export default function DocumentsPage() {
             Signed Documents
           </h2>
 
-          {signedDocs.length === 0 ? (
+          {loading && (
+            <div className="grid gap-3">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-24 rounded-lg" />
+              ))}
+            </div>
+          )}
+
+          {!loading && signedDocs.length === 0 ? (
             <Card className="p-6">
               <EmptyState
                 title="No signed documents"
@@ -136,13 +144,13 @@ export default function DocumentsPage() {
                 icon={<FileText className="h-8 w-8" />}
               />
             </Card>
-          ) : (
+          ) : !loading ? (
             <div className="grid gap-3">
               {signedDocs.map((doc) => (
                 <DocumentCard key={doc.id} doc={doc} />
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </PageContainer>
@@ -153,7 +161,7 @@ export default function DocumentsPage() {
 // Document Card
 // ---------------------------------------------------------------------------
 
-function DocumentCard({ doc }: { doc: DocumentItem }) {
+function DocumentCard({ doc }: { doc: EmployeeDocumentItem }) {
   const statusConfig = {
     pending_signature: {
       badge: "warning" as const,
@@ -170,7 +178,7 @@ function DocumentCard({ doc }: { doc: DocumentItem }) {
     },
     signed: {
       badge: "success" as const,
-      label: `Signed ${doc.signedAt}`,
+      label: `Signed ${formatShortDate(doc.signedAt ?? doc.createdAt)}`,
       icon: <CheckCircle className="h-4 w-4 text-brand-success" />,
       action: null,
     },
@@ -197,11 +205,24 @@ function DocumentCard({ doc }: { doc: DocumentItem }) {
             <Badge variant={config.badge}>{config.label}</Badge>
           </div>
           {doc.status === "pending_signature" && (
-            <p className="mt-1 text-xs text-brand-warning">Due: {doc.dueDate}</p>
+            <p className="mt-1 text-xs text-brand-warning">
+              Issued: {formatShortDate(doc.createdAt)}
+            </p>
           )}
         </div>
       </div>
       {config.action}
     </Card>
   );
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }

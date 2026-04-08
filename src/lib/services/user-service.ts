@@ -235,6 +235,80 @@ export async function updateUser(
   return mapToResponse(data);
 }
 
+export async function listMyEmployees(
+  companyId: string,
+  userId: string,
+  departmentId: string | null,
+): Promise<UserResponse[]> {
+  const supabase = createAdminClient();
+  const scopedEmployees = new Map<string, UserResponse>();
+  const departmentIds = new Set<string>();
+
+  if (departmentId) {
+    departmentIds.add(departmentId);
+  }
+
+  const { data: headedDepartments, error: headedDepartmentsError } = await supabase
+    .from("departments")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("head_id", userId);
+
+  if (headedDepartmentsError) {
+    throw new Error(
+      `Failed to resolve user department scope: ${headedDepartmentsError.message}`,
+    );
+  }
+
+  for (const department of headedDepartments ?? []) {
+    if (department.id) {
+      departmentIds.add(department.id as string);
+    }
+  }
+
+  if (departmentIds.size > 0) {
+    const { data: departmentEmployees, error: departmentEmployeesError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("company_id", companyId)
+      .eq("status", "active")
+      .neq("id", userId)
+      .in("department_id", Array.from(departmentIds));
+
+    if (departmentEmployeesError) {
+      throw new Error(
+        `Failed to list employees in department scope: ${departmentEmployeesError.message}`,
+      );
+    }
+
+    for (const employee of departmentEmployees ?? []) {
+      scopedEmployees.set(employee.id, mapToResponse(employee));
+    }
+  }
+
+  const { data: directReports, error: directReportsError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .eq("manager_id", userId)
+    .neq("id", userId);
+
+  if (directReportsError) {
+    throw new Error(`Failed to list direct reports: ${directReportsError.message}`);
+  }
+
+  for (const employee of directReports ?? []) {
+    scopedEmployees.set(employee.id, mapToResponse(employee));
+  }
+
+  return Array.from(scopedEmployees.values()).sort((a, b) => {
+    const left = `${a.last_name} ${a.first_name}`.trim().toLowerCase();
+    const right = `${b.last_name} ${b.first_name}`.trim().toLowerCase();
+    return left.localeCompare(right);
+  });
+}
+
 function mapToResponse(data: Record<string, unknown>): UserResponse {
   return {
     id: data.id as string,

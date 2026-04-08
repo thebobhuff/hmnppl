@@ -15,7 +15,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Modal } from "@/components/ui/modal";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalTitle,
+  ModalDescription,
+  ModalFooter,
+} from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   CheckCircle,
@@ -379,13 +386,14 @@ export default function DocumentReviewPage({
 
       {/* Reject Modal */}
       <Modal open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-text-primary">Reject Document</h3>
-          <p className="text-sm text-text-secondary">
-            Provide a reason for rejection and choose the next step.
-          </p>
-          <div className="space-y-4">
+        <ModalContent size="lg">
+          <ModalHeader>
+            <ModalTitle>Reject Document</ModalTitle>
+            <ModalDescription>
+              Provide a reason for rejection and choose the next step.
+            </ModalDescription>
+          </ModalHeader>
+          <div className="space-y-4 py-2">
             <div>
               <label className="block text-sm font-medium text-text-primary">
                 Reason <span className="text-brand-error">*</span>
@@ -451,73 +459,47 @@ export default function DocumentReviewPage({
                 ))}
               </div>
             </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRejectModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleReject}
-                disabled={rejectReason.length < 20}
-              >
-                Confirm Rejection
-              </Button>
-            </div>
           </div>
-        </div>
+          <ModalFooter>
+            <Button variant="outline" onClick={() => setRejectModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleReject}
+              disabled={rejectReason.length < 20}
+            >
+              Confirm Rejection
+            </Button>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
 
       {/* Approve Modal */}
       <Modal open={approveModalOpen} onOpenChange={setApproveModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-text-primary">Approve Document</h3>
-          <p className="text-sm text-text-secondary">
-            This will approve the disciplinary document and prompt meeting scheduling.
-          </p>
-          <div className="space-y-4">
+        <ModalContent size="md">
+          <ModalHeader>
+            <ModalTitle>Approve Document</ModalTitle>
+            <ModalDescription>
+              This will approve the disciplinary document and prompt meeting scheduling.
+            </ModalDescription>
+          </ModalHeader>
+          <div className="py-2">
             <p className="text-sm text-text-secondary">
               Are you sure you want to approve this document? Once approved, the system
               will prompt you to schedule a meeting with the employee.
             </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleApproveConfirm}>
-                <CheckCircle className="mr-1.5 h-4 w-4" />
-                Approve & Schedule Meeting
-              </Button>
-            </div>
           </div>
-        </div>
-      </Modal>
-
-      {/* Approve Modal */}
-      <Modal open={approveModalOpen} onOpenChange={setApproveModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-text-primary">Approve Document</h3>
-          <p className="text-sm text-text-secondary">
-            This will approve the disciplinary document and prompt meeting scheduling.
-          </p>
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Are you sure you want to approve this document? Once approved, the system
-              will prompt you to schedule a meeting with the employee.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleApproveConfirm}>
-                <CheckCircle className="mr-1.5 h-4 w-4" />
-                Approve & Schedule Meeting
-              </Button>
-            </div>
-          </div>
-        </div>
+          <ModalFooter>
+            <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleApproveConfirm}>
+              <CheckCircle className="mr-1.5 h-4 w-4" />
+              Approve & Schedule Meeting
+            </Button>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
     </PageContainer>
   );

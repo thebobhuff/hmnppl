@@ -6,9 +6,10 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Menu, ChevronDown, LogOut, UserCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, ChevronDown, LogOut, UserCircle, Search, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/stores/sidebar-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -18,6 +19,7 @@ import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { NotificationBell } from "@/components/domain/NotificationBell";
 
 export function Header() {
+  const router = useRouter();
   const breakpoint = useBreakpoint();
   const { toggleMobileOpen, collapsed } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
@@ -26,6 +28,22 @@ export function Header() {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<
+    Array<{
+      type: string;
+      id: string;
+      title: string;
+      subtitle: string;
+      href: string;
+      score?: number;
+    }>
+  >([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isMobile = breakpoint === "mobile";
   const isTablet = breakpoint === "tablet";
@@ -42,6 +60,8 @@ export function Header() {
 
   // Close profile dropdown on outside click
   useEffect(() => {
+    if (!profileOpen) return;
+
     function handleClickOutside(event: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
@@ -49,16 +69,80 @@ export function Header() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [profileOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [searchOpen]);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+      if (key === "escape") {
+        setSearchOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleShortcut);
+    return () => document.removeEventListener("keydown", handleShortcut);
   }, []);
 
   // Close dropdown on Escape
   useEffect(() => {
+    if (!profileOpen) return;
+
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setProfileOpen(false);
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, []);
+  }, [profileOpen]);
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      setSelectedResultIndex(0);
+      return;
+    }
+
+    const handle = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const res = await fetch(`/api/v1/search?q=${encodeURIComponent(searchQuery)}`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        setSearchResults(data.results || []);
+        setSelectedResultIndex(0);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (selectedResultIndex >= searchResults.length) {
+      setSelectedResultIndex(0);
+    }
+  }, [searchResults, selectedResultIndex]);
 
   return (
     <header
@@ -92,6 +176,92 @@ export function Header() {
 
       {/* Right side actions */}
       <div className="flex flex-shrink-0 items-center gap-2">
+        <div ref={searchRef} className="relative hidden md:block">
+          <div className="flex items-center rounded-lg border border-border bg-card px-3 py-1.5">
+            <Search className="h-4 w-4 text-text-tertiary" />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSearchOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (!searchOpen) return;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSelectedResultIndex((prev) =>
+                    Math.min(prev + 1, Math.max(searchResults.length - 1, 0)),
+                  );
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSelectedResultIndex((prev) => Math.max(prev - 1, 0));
+                }
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const item = searchResults[selectedResultIndex];
+                  if (item) {
+                    router.push(item.href);
+                    setSearchOpen(false);
+                    setSearchQuery("");
+                  }
+                }
+              }}
+              placeholder="Search people, policies..."
+              className="ml-2 w-56 bg-transparent text-sm outline-none placeholder:text-text-tertiary"
+            />
+            {searchLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-text-tertiary" />
+            ) : searchQuery ? (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="ml-1 text-text-tertiary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+
+          {searchOpen && searchQuery.trim().length >= 2 && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-[28rem] overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+              {searchResults.length === 0 && !searchLoading ? (
+                <div className="p-4 text-sm text-text-tertiary">No results found.</div>
+              ) : (
+                <div className="max-h-96 overflow-y-auto py-1">
+                  {searchResults.map((item) => (
+                    <button
+                      key={`${item.type}-${item.id}`}
+                      onClick={() => {
+                        router.push(item.href);
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                      }}
+                      className={cn(
+                        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-card-hover",
+                        searchResults[selectedResultIndex]?.id === item.id &&
+                          searchResults[selectedResultIndex]?.type === item.type &&
+                          "bg-card-hover",
+                      )}
+                    >
+                      <div className="mt-1 h-2 w-2 rounded-full bg-brand-primary" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary">
+                          {item.title}
+                        </p>
+                        <p className="truncate text-xs text-text-tertiary">
+                          {item.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Notification Bell */}
         <NotificationBell />
 
