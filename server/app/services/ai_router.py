@@ -300,6 +300,7 @@ class AIRouter:
             "mistralai/mistral-large": 0.004,
             "anthropic/claude-3.5-sonnet": 0.003,
             "openai/gpt-4o": 0.0025,
+            "stepfun/step-3.5-flash:free": 0.0,
         }
 
         rate = pricing.get(model, 0.001)

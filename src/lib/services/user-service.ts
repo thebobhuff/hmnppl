@@ -77,6 +77,36 @@ export async function listUsers(
   };
 }
 
+export async function listMyEmployees(
+  companyId: string,
+  userId: string,
+  departmentId?: string | null,
+): Promise<UserResponse[]> {
+  const supabase = createAdminClient();
+
+  let query = supabase
+    .from("users")
+    .select("*, companies(name)")
+    .eq("company_id", companyId)
+    .eq("role", "employee")
+    .neq("id", userId)
+    .order("last_name", { ascending: true });
+
+  if (departmentId) {
+    query = query.or(`manager_id.eq.${userId},department_id.eq.${departmentId}`);
+  } else {
+    query = query.eq("manager_id", userId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to list scoped employees: ${error.message}`);
+  }
+
+  return (data ?? []).map(mapToResponse);
+}
+
 export async function getUser(
   companyId: string,
   userId: string,
