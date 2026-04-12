@@ -2,26 +2,44 @@ import dynamic from "next/dynamic";
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
 import Footer from "@/components/landing/Footer";
+import SchemaMarkup from "@/components/landing/SchemaMarkup";
 
 /**
+ * Landing page with SEO-optimized sections.
  * Below-fold sections are lazy-loaded for aggressive code splitting.
  * Framer Motion is only included in chunks for this route.
  */
+const ProblemSection = dynamic(() => import("@/components/landing/ProblemSection"), {
+  loading: () => <SectionSkeleton />,
+});
+
 const FeatureGrid = dynamic(() => import("@/components/landing/FeatureGrid"), {
-  loading: () => <FeatureGridSkeleton />,
+  loading: () => <SectionSkeleton />,
+});
+
+const ComparisonTable = dynamic(() => import("@/components/landing/ComparisonTable"), {
+  loading: () => <SectionSkeleton />,
+});
+
+const FAQSection = dynamic(() => import("@/components/landing/FAQSection"), {
+  loading: () => <SectionSkeleton />,
 });
 
 const CTASection = dynamic(() => import("@/components/landing/CTASection"), {
-  loading: () => <CTASectionSkeleton />,
+  loading: () => <SectionSkeleton />,
 });
 
 export default function LandingPage() {
   return (
     <>
+      <SchemaMarkup />
       <Navbar />
       <main>
         <Hero />
+        <ProblemSection />
         <FeatureGrid />
+        <ComparisonTable />
+        <FAQSection />
         <CTASection />
       </main>
       <Footer />
@@ -29,38 +47,14 @@ export default function LandingPage() {
   );
 }
 
-/* ── Skeleton placeholders ─────────────────────────────────────────────── */
-
-function FeatureGridSkeleton() {
+function SectionSkeleton() {
   return (
     <section className="mx-auto max-w-7xl px-6 py-24">
-      <div className="mb-16 text-center">
-        <div className="mx-auto h-10 w-72 animate-pulse rounded bg-brand-slate-light/30" />
-        <div className="mx-auto mt-4 h-6 w-96 animate-pulse rounded bg-brand-slate-light/20" />
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-72 animate-pulse rounded bg-brand-slate-light/30" />
+        <div className="h-6 w-96 animate-pulse rounded bg-brand-slate-light/20" />
+        <div className="mt-8 h-64 w-full animate-pulse rounded-2xl bg-brand-slate-light/10" />
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="animate-pulse rounded-2xl border border-brand-slate-light bg-brand-slate p-8"
-          >
-            <div className="mb-4 h-12 w-12 rounded-xl bg-brand-slate-light/30" />
-            <div className="mb-2 h-6 w-40 rounded bg-brand-slate-light/30" />
-            <div className="space-y-2">
-              <div className="h-4 w-full rounded bg-brand-slate-light/20" />
-              <div className="h-4 w-3/4 rounded bg-brand-slate-light/20" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CTASectionSkeleton() {
-  return (
-    <section className="px-6 py-24">
-      <div className="mx-auto h-72 max-w-3xl animate-pulse rounded-2xl border border-brand-slate-light bg-brand-slate" />
     </section>
   );
 }

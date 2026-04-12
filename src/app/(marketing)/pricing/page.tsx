@@ -1,5 +1,13 @@
 import Link from "next/link";
 import Navbar from "@/components/landing/Navbar";
+import type {{ Metadata }} from "next";
+
+export const metadata: Metadata = {{
+  title: "Pricing - AI HR Platform for Employee Discipline | HMN/PPL",
+  description: "Transparent pricing for AI-powered HR management. Starter at $149/mo, Growth at $399/mo, Enterprise custom pricing. No per-employee fees for Starter.",
+  alternates: {{ canonical: "https://hmnppl.ai/pricing" }},
+}};
+
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
