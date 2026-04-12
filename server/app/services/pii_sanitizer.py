@@ -1,4 +1,4 @@
-"""PII Sanitizer — strips/pseudonymizes sensitive data before AI calls.
+﻿"""PII Sanitizer — strips/pseudonymizes sensitive data before AI calls.
 
 Ensures no PII (SSN, salary, address, email, phone) is sent to AI providers.
 Complies with NFR-010: "All PII stripped/pseudonymized before sending to AI providers."
@@ -123,3 +123,54 @@ def verify_no_pii(text: str) -> list[str]:
         if pattern.search(text):
             detected.append(label)
     return detected
+
+
+# ---- L-010: Protected Class Guardrails ----
+# Per Lijo Joseph: Agent must avoid documenting protected class info (discoverable risk)
+
+_PROTECTED_CLASS_TERMS = [
+    re.compile(r'\b(age|over\s+\d{2}|under\s+\d{2})\b', re.IGNORECASE),
+    re.compile(r'\b(race|ethnicity|national\s+origin|ancestry)\b', re.IGNORECASE),
+    re.compile(r'\b(gender|sex|sexual\s+orientation|pregnancy|maternity)\b', re.IGNORECASE),
+    re.compile(r'\b(religion|religious|faith|creed)\b', re.IGNORECASE),
+    re.compile(r'\b(disability|disabled|handicap|handicapped|impairment)\b', re.IGNORECASE),
+    re.compile(r'\b(veteran|military\s+service|armed\s+forces)\b', re.IGNORECASE),
+    re.compile(r'\b(genetic\s+information|dna|hereditary)\b', re.IGNORECASE),
+    re.compile(r'\b(marital\s+status|married|divorced|single|widowed)\b', re.IGNORECASE),
+    re.compile(r'\b(pregnant|pregnancy|maternity\s+leave|paternity)\b', re.IGNORECASE),
+    re.compile(r'\b(african|asian|hispanic|latino|caucasian|native\s+american|pacific\s+islander)\b', re.IGNORECASE),
+    re.compile(r'\b(muslim|christian|jewish|buddhist|hindu|sikh|atheist|agnostic)\b', re.IGNORECASE),
+]
+
+_PROTECTED_CLASS_CATEGORIES = [
+    "age", "race/national_origin", "gender/sex", "religion",
+    "disability", "veteran_status", "genetic_info", "marital_status",
+    "pregnancy", "race_ethnicity", "religion",
+]
+
+
+def detect_protected_class_references(text: str) -> list[dict[str, str]]:
+    """Detect protected class references in text that should not be documented."""
+    findings = []
+    for i, pattern in enumerate(_PROTECTED_CLASS_TERMS):
+        matches = pattern.findall(text)
+        if matches:
+            cat = _PROTECTED_CLASS_CATEGORIES[i] if i < len(_PROTECTED_CLASS_CATEGORIES) else "protected_class"
+            for match in (matches if isinstance(matches, list) else [matches]):
+                term = match if isinstance(match, str) else str(match)
+                findings.append({"term": term, "category": cat})
+    return findings
+
+
+def strip_protected_class_references(text: str) -> tuple[str, list[dict[str, str]]]:
+    """Remove protected class references from text and return cleaned text + report.
+
+    Per Lijo: protected class info is discoverable in legal proceedings.
+    The agent must not document it.
+    """
+    findings = detect_protected_class_references(text)
+    cleaned = text
+    for finding in findings:
+        term = finding["term"]
+        cleaned = cleaned.replace(term, "[PROTECTED_INFO_REMOVED]")
+    return cleaned, findings
