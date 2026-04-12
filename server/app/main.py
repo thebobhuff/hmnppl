@@ -20,6 +20,7 @@ from app.core.rate_limit import TIER_AI, TIER_STANDARD, RateLimiter
 from app.core.security import create_request_size_middleware
 from app.routers import agents, ai, health
 from app.routers.wave6_agents import router as wave6_router
+from app.routers.compliance import router as compliance_router
 
 # ---- Lifespan ----
 
@@ -108,6 +109,7 @@ def create_app() -> FastAPI:
     app.include_router(ai.router)
     app.include_router(agents.router)
     app.include_router(wave6_router)
+    app.include_router(compliance_router)
 
     return app
 
