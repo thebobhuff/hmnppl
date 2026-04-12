@@ -21,7 +21,7 @@ import {
 // GET — List incidents
 // ---------------------------------------------------------------------------
 
-export const GET = withAuth({ roles: roleGuards.hrAgent }, async (request) => {
+export const GET = withAuth({ roles: roleGuards.manager }, async (request) => {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
