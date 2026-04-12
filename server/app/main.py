@@ -16,10 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
-from app.core.rate_limit import RateLimiter, TIER_AI, TIER_STANDARD
+from app.core.rate_limit import TIER_AI, TIER_STANDARD, RateLimiter
 from app.core.security import create_request_size_middleware
-from app.routers import ai, agents, health
-
+from app.routers import agents, ai, health
 
 # ---- Lifespan ----
 

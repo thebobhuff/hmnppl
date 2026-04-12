@@ -6,7 +6,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import {
   MessageCircle,
   X,
@@ -98,6 +97,10 @@ function safeUUID(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : String(Date.now());
+}
+
+function MarkdownLikeText({ children }: { children: string }) {
+  return <div className="whitespace-pre-wrap break-words">{children}</div>;
 }
 
 export function AIAssistantPanel({ isOpen, onClose }: PanelProps) {
@@ -407,7 +410,7 @@ export function AIAssistantPanel({ isOpen, onClose }: PanelProps) {
               </Button>
             </div>
             <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-brand-slate-light p-3 text-xs">
-              <ReactMarkdown>{draftPolicy}</ReactMarkdown>
+              <MarkdownLikeText>{draftPolicy}</MarkdownLikeText>
             </div>
           </div>
         )}
@@ -432,7 +435,7 @@ export function AIAssistantPanel({ isOpen, onClose }: PanelProps) {
                 >
                   {message.role === "assistant" ? (
                     <div className="prose prose-sm prose-invert max-w-none">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                      <MarkdownLikeText>{message.content}</MarkdownLikeText>
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap text-sm">{message.content}</p>

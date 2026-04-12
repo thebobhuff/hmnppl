@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useAuthStore } from "@/stores/auth-store";
 import { incidentsAPI, type APIError } from "@/lib/api/client";
 import { APIErrorFallback } from "@/components/domain/ErrorBoundary";
+import { createClient } from "@/lib/supabase/client";
 import {
   Users,
   AlertTriangle,
@@ -137,6 +138,13 @@ interface DirectReport {
   email: string;
 }
 
+interface EvidenceAttachmentPayload {
+  name: string;
+  url: string;
+  size_bytes: number;
+  content_type?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -238,12 +246,18 @@ export default function ReportIssuePage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const evidenceAttachments = await uploadEvidenceFiles(
+        user?.tenantId,
+        formData.evidence,
+      );
+
       const result = await incidentsAPI.create({
         employee_id: formData.employeeId,
         type: formData.issueType,
         incident_date: formData.incidentDate,
         severity: formData.severity,
         description: formData.description,
+        evidence_attachments: evidenceAttachments,
         witness_ids: formData.witnessIds,
         union_involved: formData.unionInvolved,
       });
@@ -255,7 +269,7 @@ export default function ReportIssuePage() {
     } finally {
       setSubmitting(false);
     }
-  }, [formData]);
+  }, [formData, user?.tenantId]);
 
   if (submitted) {
     return (
@@ -327,9 +341,11 @@ export default function ReportIssuePage() {
           )}
           {step === 3 && (
             <Step3Evidence
+              evidence={formData.evidence}
               witnessIds={formData.witnessIds}
               unionInvolved={formData.unionInvolved}
               directReports={directReports}
+              onEvidenceChange={(files) => updateField("evidence", files)}
               onWitnessesChange={(ids) => updateField("witnessIds", ids)}
               onUnionToggle={(val) => updateField("unionInvolved", val)}
             />
@@ -554,15 +570,19 @@ function Step2IncidentDetails({
 // ---------------------------------------------------------------------------
 
 function Step3Evidence({
+  evidence,
   witnessIds,
   unionInvolved,
   directReports,
+  onEvidenceChange,
   onWitnessesChange,
   onUnionToggle,
 }: {
+  evidence: File[];
   witnessIds: string[];
   unionInvolved: boolean;
   directReports: DirectReport[];
+  onEvidenceChange: (files: File[]) => void;
   onWitnessesChange: (ids: string[]) => void;
   onUnionToggle: (val: boolean) => void;
 }) {
@@ -579,8 +599,15 @@ function Step3Evidence({
           <FileUpload
             maxSize={10 * 1024 * 1024}
             accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-            onFilesChange={() => {}}
+            multiple
+            maxFiles={5}
+            onFilesChange={onEvidenceChange}
           />
+          {evidence.length > 0 && (
+            <p className="mt-2 text-xs text-text-tertiary">
+              {evidence.length} attachment{evidence.length === 1 ? "" : "s"} ready to upload on submission.
+            </p>
+          )}
         </div>
       </div>
 
@@ -614,6 +641,55 @@ function Step3Evidence({
       </div>
     </div>
   );
+}
+
+async function uploadEvidenceFiles(
+  companyId: string | undefined,
+  files: File[],
+): Promise<EvidenceAttachmentPayload[]> {
+  if (!files.length) {
+    return [];
+  }
+
+  if (!companyId) {
+    throw new Error("Company context is missing for evidence upload.");
+  }
+
+  const supabase = createClient();
+  const uploadedFiles = await Promise.all(
+    files.map(async (file) => {
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const filePath = `${companyId}/drafts/${Date.now()}-${crypto.randomUUID()}-${sanitizedName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("evidence")
+        .upload(filePath, file, {
+          upsert: false,
+          contentType: file.type || undefined,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from("evidence")
+        .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        throw new Error(signedUrlError?.message || "Failed to generate access URL");
+      }
+
+      return {
+        name: file.name,
+        url: signedUrlData.signedUrl,
+        size_bytes: file.size,
+        content_type: file.type || undefined,
+      };
+    }),
+  );
+
+  return uploadedFiles;
 }
 
 // ---------------------------------------------------------------------------

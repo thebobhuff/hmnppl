@@ -32,8 +32,9 @@
  * This means role changes in the DB are reflected immediately.
  */
 import { NextResponse } from "next/server";
-import { getCurrentUser, type UserProfile, type UserRole } from "./session";
+import { validateCsrfToken } from "../csrf";
 import { checkApiPermission } from "./permissions";
+import { getCurrentUser, type UserProfile, type UserRole } from "./session";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -144,6 +145,13 @@ export function withAuth(
     request: Request,
     context: { params: Promise<Record<string, string>> },
   ): Promise<Response> => {
+    // ── 0. CSRF Protection for Mutations ─────────────────────────────────
+    const method = request.method.toUpperCase();
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      const csrfError = await validateCsrfToken(request);
+      if (csrfError) return csrfError;
+    }
+
     // ── 1. Authenticate — read from DB, not JWT alone ──────────────────
     const user = await getCurrentUser();
     if (!user) {

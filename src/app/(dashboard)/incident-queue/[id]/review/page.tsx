@@ -8,35 +8,29 @@
  */
 "use client";
 
-import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
+import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
+import { incidentsAPI } from "@/lib/api/client";
 import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalTitle,
-  ModalDescription,
-  ModalFooter,
-} from "@/components/ui/modal";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  CheckCircle,
-  XCircle,
-  Edit3,
-  FileText,
-  User,
-  Calendar,
   AlertTriangle,
   Brain,
+  Calendar,
+  CheckCircle,
   ChevronRight,
   Clock,
+  Edit3,
+  FileText,
   TrendingUp,
+  User,
+  XCircle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Mock Data
@@ -67,10 +61,10 @@ const MOCK_INCIDENT = {
 
 const MOCK_DOCUMENT = `# Written Warning — Attendance Policy Violation
 
-**Employee:** John Smith  
-**Position:** Software Engineer  
-**Department:** Engineering  
-**Date:** March 15, 2026  
+**Employee:** John Smith
+**Position:** Software Engineer
+**Department:** Engineering
+**Date:** March 15, 2026
 **Reference:** INC-2026-0042
 
 ---
@@ -102,7 +96,7 @@ Failure to comply with the above requirements may result in further disciplinary
 
 **Employee Acknowledgment:** I acknowledge receipt of this written warning.
 
-**HR Representative:** Maria Garcia  
+**HR Representative:** Maria Garcia
 **Date:** ___________`;
 
 const MOCK_TIMELINE = [
@@ -142,6 +136,7 @@ export default function DocumentReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = params as unknown as { id: string };
+  const router = useRouter();
   const [reviewMode, setReviewMode] = useState<"view" | "edit">("view");
   const [documentContent, setDocumentContent] = useState(MOCK_DOCUMENT);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -161,15 +156,28 @@ export default function DocumentReviewPage({
     setApproveModalOpen(true);
   };
 
-  const handleApproveConfirm = () => {
-    // TODO: Call API to approve
-    setApproveModalOpen(false);
+  const handleApproveConfirm = async () => {
+    try {
+      await incidentsAPI.updateStatus(resolvedParams.id, { status: "approved" });
+      setApproveModalOpen(false);
+      router.push("/incident-queue");
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (rejectReason.length < 20) return;
-    // TODO: Call API to reject
-    setRejectModalOpen(false);
+    try {
+      await incidentsAPI.updateStatus(resolvedParams.id, {
+        status: "rejected",
+        reason: rejectReason,
+      });
+      setRejectModalOpen(false);
+      router.push("/incident-queue");
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -386,14 +394,13 @@ export default function DocumentReviewPage({
 
       {/* Reject Modal */}
       <Modal open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <ModalContent size="lg">
-          <ModalHeader>
-            <ModalTitle>Reject Document</ModalTitle>
-            <ModalDescription>
-              Provide a reason for rejection and choose the next step.
-            </ModalDescription>
-          </ModalHeader>
-          <div className="space-y-4 py-2">
+        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-text-primary">Reject Document</h3>
+          <p className="text-sm text-text-secondary">
+            Provide a reason for rejection and choose the next step.
+          </p>
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-text-primary">
                 Reason <span className="text-brand-error">*</span>
@@ -459,47 +466,73 @@ export default function DocumentReviewPage({
                 ))}
               </div>
             </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRejectModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleReject}
+                disabled={rejectReason.length < 20}
+              >
+                Confirm Rejection
+              </Button>
+            </div>
           </div>
-          <ModalFooter>
-            <Button variant="outline" onClick={() => setRejectModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              onClick={handleReject}
-              disabled={rejectReason.length < 20}
-            >
-              Confirm Rejection
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+        </div>
       </Modal>
 
       {/* Approve Modal */}
       <Modal open={approveModalOpen} onOpenChange={setApproveModalOpen}>
-        <ModalContent size="md">
-          <ModalHeader>
-            <ModalTitle>Approve Document</ModalTitle>
-            <ModalDescription>
-              This will approve the disciplinary document and prompt meeting scheduling.
-            </ModalDescription>
-          </ModalHeader>
-          <div className="py-2">
+        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-text-primary">Approve Document</h3>
+          <p className="text-sm text-text-secondary">
+            This will approve the disciplinary document and prompt meeting scheduling.
+          </p>
+          <div className="space-y-4">
             <p className="text-sm text-text-secondary">
               Are you sure you want to approve this document? Once approved, the system
               will prompt you to schedule a meeting with the employee.
             </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleApproveConfirm}>
+                <CheckCircle className="mr-1.5 h-4 w-4" />
+                Approve & Schedule Meeting
+              </Button>
+            </div>
           </div>
-          <ModalFooter>
-            <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleApproveConfirm}>
-              <CheckCircle className="mr-1.5 h-4 w-4" />
-              Approve & Schedule Meeting
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+        </div>
+      </Modal>
+
+      {/* Approve Modal */}
+      <Modal open={approveModalOpen} onOpenChange={setApproveModalOpen}>
+        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-text-primary">Approve Document</h3>
+          <p className="text-sm text-text-secondary">
+            This will approve the disciplinary document and prompt meeting scheduling.
+          </p>
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Are you sure you want to approve this document? Once approved, the system
+              will prompt you to schedule a meeting with the employee.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleApproveConfirm}>
+                <CheckCircle className="mr-1.5 h-4 w-4" />
+                Approve & Schedule Meeting
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
     </PageContainer>
   );

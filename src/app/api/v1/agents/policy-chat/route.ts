@@ -1,58 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/session";
 
-const PYTHON_AI_SERVICE_URL =
-  process.env.PYTHON_AI_SERVICE_URL || "http://localhost:8000";
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-interface ChatFile {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  content: string;
-}
-
-interface ChatContext {
-  screen?: {
-    pathname: string;
-    label: string;
-    policyCount: number;
-  };
-  policies?: Array<{ id: string; title: string; category: string; status: string }>;
-  files?: ChatFile[];
-}
-
-export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { conversation_id, message, history, context } = body as {
-      conversation_id?: string;
-      message: string;
-      history?: Array<{ role: string; content: string }>;
-      context?: ChatContext;
-    };
+    const apiUrl = process.env.VITE_API_URL || process.env.SERVER_API_URL || "http://localhost:8000";
 
-    const response = await fetch(`${PYTHON_AI_SERVICE_URL}/agents/policy-chat`, {
+    const response = await fetch(`${apiUrl}/agents/policy-chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": process.env.AI_SERVICE_API_KEY || "",
+        "X-API-Key": process.env.API_KEY || "dev-key",
       },
       body: JSON.stringify({
-        conversation_id,
-        message,
-        history,
-        context,
+        message: body.message,
+        company_id: user.companyId,
+        employee_id: user.id,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`AI service error: ${response.status}`);
+      const errorText = await response.text();
+      return NextResponse.json({ error: errorText }, { status: response.status });
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Policy chat error:", error);
-    return NextResponse.json({ error: "Failed to process policy chat" }, { status: 500 });
+    console.error("Policy chat proxy error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

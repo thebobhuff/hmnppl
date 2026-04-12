@@ -305,3 +305,28 @@ class AIRouter:
 
         rate = pricing.get(model, 0.001)
         return (total_tokens / 1000) * rate
+
+    async def get_embeddings(self, texts: list[str]) -> list[list[float]]:
+        """Get embeddings (via OpenRouter OpenAI shim)."""
+        if not self.settings.OPENROUTER_API_KEY:
+            raise RuntimeError("OPENROUTER_API_KEY not configured")
+            
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {self.settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "input": texts,
+                    "model": "openai/text-embedding-3-small"
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+        embeddings = []
+        for item in sorted(data.get("data", []), key=lambda x: x.get("index", 0)):
+            embeddings.append(item["embedding"])
+        return embeddings

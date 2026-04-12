@@ -6,8 +6,8 @@
  *   - For new users: creates a company workspace + user profile
  *   - For returning users: updates last_login_at
  */
-import { createServerClient } from "@supabase/ssr";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 /** Cookie names — kept in sync with middleware.ts */
 const COOKIE_SESSION_START = "hr_session_start";
 const COOKIE_USER_ROLE = "hr_user_role";
+const COOKIE_ONBOARDING_STATUS = "hr_onboarding_completed";
 
 /**
  * Sets a session-tracking cookie with strict security attributes.
@@ -32,7 +33,7 @@ function setSessionCookie(
     value,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     ...(maxAgeSeconds !== undefined ? { maxAge: maxAgeSeconds } : {}),
   });
@@ -100,13 +101,17 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          try {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          } catch {
+            // NextRequest tracking fails in route handlers, but response headers will apply
+          }
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, {
               ...options,
               httpOnly: true,
               secure: process.env.NODE_ENV === "production",
-              sameSite: "strict",
+              sameSite: "lax", // Must be lax for OAuth redirects!
               path: "/",
             });
           });
@@ -142,7 +147,7 @@ export async function GET(request: NextRequest) {
   // Check if user already has a profile in the users table
   const { data: existingProfile } = await admin
     .from("users")
-    .select("id, role")
+    .select("id, role, company:companies!company_id(onboarding_completed)")
     .eq("id", user.id)
     .single();
 
@@ -156,6 +161,18 @@ export async function GET(request: NextRequest) {
     // Set session cookies with the existing role
     setSessionCookie(response, COOKIE_SESSION_START, Date.now().toString(), 60 * 60 * 8);
     setSessionCookie(response, COOKIE_USER_ROLE, existingProfile.role, 60 * 60 * 8);
+
+    const isCompanyOnboarded =
+      existingProfile.company && !Array.isArray(existingProfile.company)
+        ? (existingProfile.company as unknown as { onboarding_completed: boolean })
+            .onboarding_completed
+        : false;
+    setSessionCookie(
+      response,
+      COOKIE_ONBOARDING_STATUS,
+      isCompanyOnboarded ? "1" : "0",
+      60 * 60 * 8,
+    );
 
     return response;
   }
@@ -210,6 +227,7 @@ export async function GET(request: NextRequest) {
     // 3. Set session cookies
     setSessionCookie(response, COOKIE_SESSION_START, Date.now().toString(), 60 * 60 * 8);
     setSessionCookie(response, COOKIE_USER_ROLE, "company_admin", 60 * 60 * 8);
+    setSessionCookie(response, COOKIE_ONBOARDING_STATUS, "0", 60 * 60 * 8); // Because we just created it
   } catch (err) {
     console.error("[auth/callback] Unexpected error:", err);
     return NextResponse.redirect(

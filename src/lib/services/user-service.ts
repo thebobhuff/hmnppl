@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export interface UserResponse {
   id: string;
   company_id: string;
+  company_name?: string | null;
   department_id: string | null;
   role: string;
   first_name: string;
@@ -76,6 +77,36 @@ export async function listUsers(
   };
 }
 
+export async function listMyEmployees(
+  companyId: string,
+  userId: string,
+  departmentId?: string | null,
+): Promise<UserResponse[]> {
+  const supabase = createAdminClient();
+
+  let query = supabase
+    .from("users")
+    .select("*, companies(name)")
+    .eq("company_id", companyId)
+    .eq("role", "employee")
+    .neq("id", userId)
+    .order("last_name", { ascending: true });
+
+  if (departmentId) {
+    query = query.or(`manager_id.eq.${userId},department_id.eq.${departmentId}`);
+  } else {
+    query = query.eq("manager_id", userId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to list scoped employees: ${error.message}`);
+  }
+
+  return (data ?? []).map(mapToResponse);
+}
+
 export async function getUser(
   companyId: string,
   userId: string,
@@ -84,7 +115,7 @@ export async function getUser(
 
   const { data, error } = await supabase
     .from("users")
-    .select("*")
+    .select("*, companies(name)")
     .eq("id", userId)
     .eq("company_id", companyId)
     .single();
@@ -235,84 +266,47 @@ export async function updateUser(
   return mapToResponse(data);
 }
 
-export async function listMyEmployees(
+export async function updateOwnUser(
   companyId: string,
   userId: string,
-  departmentId: string | null,
-): Promise<UserResponse[]> {
+  updates: Partial<{
+    first_name: string;
+    last_name: string;
+    job_title: string | null;
+    phone: string | null;
+    avatar_url: string | null;
+  }>,
+): Promise<UserResponse> {
   const supabase = createAdminClient();
-  const scopedEmployees = new Map<string, UserResponse>();
-  const departmentIds = new Set<string>();
 
-  if (departmentId) {
-    departmentIds.add(departmentId);
-  }
-
-  const { data: headedDepartments, error: headedDepartmentsError } = await supabase
-    .from("departments")
-    .select("id")
-    .eq("company_id", companyId)
-    .eq("head_id", userId);
-
-  if (headedDepartmentsError) {
-    throw new Error(
-      `Failed to resolve user department scope: ${headedDepartmentsError.message}`,
-    );
-  }
-
-  for (const department of headedDepartments ?? []) {
-    if (department.id) {
-      departmentIds.add(department.id as string);
-    }
-  }
-
-  if (departmentIds.size > 0) {
-    const { data: departmentEmployees, error: departmentEmployeesError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("company_id", companyId)
-      .eq("status", "active")
-      .neq("id", userId)
-      .in("department_id", Array.from(departmentIds));
-
-    if (departmentEmployeesError) {
-      throw new Error(
-        `Failed to list employees in department scope: ${departmentEmployeesError.message}`,
-      );
-    }
-
-    for (const employee of departmentEmployees ?? []) {
-      scopedEmployees.set(employee.id, mapToResponse(employee));
-    }
-  }
-
-  const { data: directReports, error: directReportsError } = await supabase
+  const { data, error } = await supabase
     .from("users")
-    .select("*")
+    .update(updates)
+    .eq("id", userId)
     .eq("company_id", companyId)
-    .eq("status", "active")
-    .eq("manager_id", userId)
-    .neq("id", userId);
+    .select("*, companies(name)")
+    .single();
 
-  if (directReportsError) {
-    throw new Error(`Failed to list direct reports: ${directReportsError.message}`);
+  if (error) {
+    throw new Error(`Failed to update profile: ${error.message}`);
   }
 
-  for (const employee of directReports ?? []) {
-    scopedEmployees.set(employee.id, mapToResponse(employee));
-  }
-
-  return Array.from(scopedEmployees.values()).sort((a, b) => {
-    const left = `${a.last_name} ${a.first_name}`.trim().toLowerCase();
-    const right = `${b.last_name} ${b.first_name}`.trim().toLowerCase();
-    return left.localeCompare(right);
-  });
+  return mapToResponse(data);
 }
 
 function mapToResponse(data: Record<string, unknown>): UserResponse {
+  const companies = data.companies as
+    | { name?: string | null }
+    | { name?: string | null }[]
+    | null;
+  const companyName = Array.isArray(companies)
+    ? (companies[0]?.name ?? null)
+    : (companies?.name ?? null);
+
   return {
     id: data.id as string,
     company_id: data.company_id as string,
+    company_name: companyName,
     department_id: (data.department_id as string) ?? null,
     role: data.role as string,
     first_name: (data.first_name as string) ?? "",

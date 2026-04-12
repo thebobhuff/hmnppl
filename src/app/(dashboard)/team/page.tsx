@@ -13,14 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalTitle,
-  ModalDescription,
-  ModalFooter,
-} from "@/components/ui/modal";
+import { Modal, ModalContent } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { APIErrorFallback } from "@/components/domain/ErrorBoundary";
@@ -343,12 +336,12 @@ function InviteModal({
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
-      <ModalContent size="md">
-        <ModalHeader>
-          <ModalTitle>Invite Team Member</ModalTitle>
-          <ModalDescription>Send an invitation to join the HR platform.</ModalDescription>
-        </ModalHeader>
-        <div className="space-y-4 py-2">
+      <ModalContent size="sm">
+        <h3 className="text-lg font-semibold text-text-primary">Invite Team Member</h3>
+        <p className="text-sm text-text-secondary">
+          Send an invitation to join the HR platform.
+        </p>
+        <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-text-primary">
               Email Address
@@ -375,20 +368,20 @@ function InviteModal({
               className="mt-2"
             />
           </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={!email || !role || loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send Invitation
+            </Button>
+          </div>
         </div>
-        <ModalFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!email || !role || loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Send Invitation
-          </Button>
-        </ModalFooter>
       </ModalContent>
     </Modal>
   );

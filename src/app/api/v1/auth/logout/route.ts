@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 const COOKIE_SESSION_START = "hr_session_start";
 const COOKIE_LAST_ACTIVITY = "hr_last_activity";
 const COOKIE_USER_ROLE = "hr_user_role";
+const COOKIE_ONBOARDING_STATUS = "hr_onboarding_completed";
 
 // ---------------------------------------------------------------------------
 // POST handler
@@ -58,6 +59,7 @@ export async function POST() {
   response.cookies.delete(COOKIE_SESSION_START);
   response.cookies.delete(COOKIE_LAST_ACTIVITY);
   response.cookies.delete(COOKIE_USER_ROLE);
+  response.cookies.delete(COOKIE_ONBOARDING_STATUS);
 
   // Clear any Supabase auth cookies that might remain
   const allCookies = cookieStore.getAll();

@@ -10,19 +10,11 @@
  * This protects against Cross-Site Request Forgery without requiring
  * server-side session storage.
  */
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
-
-/**
- * GET /api/v1/csrf-token — Generate and return a CSRF token.
- *
- * Sets a cookie with the token and returns it in the response body.
- * The client should read the token and include it in the X-CSRF-Token
- * header on all state-changing requests (POST, PUT, PATCH, DELETE).
- */
 export async function GET() {
   const token = generateToken();
 
@@ -69,60 +61,10 @@ export async function validateCsrfToken(request: Request): Promise<NextResponse 
 /**
  * Generate a cryptographically secure random token.
  */
-function generateToken(): string {
+export function generateToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-}
-
-/**
- * Client-side helper to fetch CSRF token and include it in requests.
- *
- * Usage:
- * ```ts
- * const { csrfFetch } = await import("@/lib/csrf");
- * const response = await csrfFetch("/api/v1/incidents", {
- *   method: "POST",
- *   body: JSON.stringify(data),
- * });
- * ```
- */
-export async function csrfFetch(
-  url: string,
-  options: RequestInit = {},
-): Promise<Response> {
-  // Fetch CSRF token if not already cached
-  let token: string | null = getCsrfTokenFromCookie();
-  if (!token) {
-    const response = await fetch("/api/v1/csrf-token");
-    const data = await response.json();
-    token = data.token ?? null;
-  }
-
-  if (!token) {
-    throw new Error("Failed to obtain CSRF token");
-  }
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "X-CSRF-Token": token,
-    ...(options.headers as Record<string, string>),
-  };
-
-  return fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
-}
-
-/**
- * Read CSRF token from document.cookie (client-side only).
- */
-function getCsrfTokenFromCookie(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE_NAME}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
 }

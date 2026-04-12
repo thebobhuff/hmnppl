@@ -51,12 +51,15 @@ DEFAULT_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 def _get_db_url() -> str:
     """Resolve the database URL from environment or fall back to local dev default."""
-    return os.environ.get("SUPABASE_DB_URL", os.environ.get("DATABASE_URL", DEFAULT_DB_URL))
+    return os.environ.get(
+        "SUPABASE_DB_URL", os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
+    )
 
 
 # ---------------------------------------------------------------------------
 # Connection helpers
 # ---------------------------------------------------------------------------
+
 
 def get_service_connection() -> psycopg2.extensions.connection:
     """Return a new psycopg2 connection using the service role (postgres user).
@@ -70,7 +73,9 @@ def get_service_connection() -> psycopg2.extensions.connection:
 
 
 @contextmanager
-def connection_as(user_id: str, company_id: str, role: str) -> Generator[psycopg2.extensions.connection, None, None]:
+def connection_as(
+    user_id: str, company_id: str, role: str
+) -> Generator[psycopg2.extensions.connection, None, None]:
     """Context manager that yields a psycopg2 connection impersonating a specific user.
 
     Sets the PostgreSQL role to ``authenticated`` and configures the
@@ -108,6 +113,7 @@ def connection_as(user_id: str, company_id: str, role: str) -> Generator[psycopg
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def db_url() -> str:
@@ -152,6 +158,7 @@ def _reset_rls_state():
 # Authenticated client factory fixture
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def client_as():
     """Return a factory function that creates an authenticated database connection.
@@ -181,7 +188,9 @@ def client_as():
     """
     connections_to_close: list[psycopg2.extensions.connection] = []
 
-    def _factory(role: str, company_id: str, user_id: str) -> psycopg2.extensions.connection:
+    def _factory(
+        role: str, company_id: str, user_id: str
+    ) -> psycopg2.extensions.connection:
         ctx = connection_as(user_id=user_id, company_id=company_id, role=role)
         conn = ctx.__enter__()
         connections_to_close.append(conn)
@@ -201,6 +210,7 @@ def client_as():
 # UUID helpers for deterministic test data
 # ---------------------------------------------------------------------------
 
+
 def uuid_v5(name: str) -> str:
     """Generate a deterministic UUID v5 from a name string using the DNS namespace.
 
@@ -213,14 +223,17 @@ def uuid_v5(name: str) -> str:
     Returns:
         A UUID v5 string (lowercase, with hyphens).
     """
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"hr-test-platform.{name}))
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"hr-test-platform.{name}"))
 
 
 # ---------------------------------------------------------------------------
 # Database cleanup helper
 # ---------------------------------------------------------------------------
 
-def clean_test_data(svc_conn: psycopg2.extensions.connection, prefix: str = "TestCo") -> None:
+
+def clean_test_data(
+    svc_conn: psycopg2.extensions.connection, prefix: str = "TestCo"
+) -> None:
     """Remove all test data matching the given company name prefix.
 
     Uses CASCADE deletes to clean up dependent rows.  Runs with the

@@ -1,130 +1,93 @@
-/**
- * AI Performance — Super Admin AI service monitoring.
- */
-
-"use client";
-
 import { PageContainer } from "@/components/layout/PageContainer";
-import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Brain,
-  Activity,
-  Clock,
-  DollarSign,
-  TrendingUp,
-  AlertTriangle,
-} from "lucide-react";
+import { AiPerformanceCharts } from "./charts";
+import { createClient } from "@/lib/supabase/server";
 
-export default function AIPerformancePage() {
-  usePageBreadcrumbs([{ label: "AI Performance" }]);
+export default async function AiPerformancePage() {
+  const supabase = await createClient();
+
+  // Note: we fetch all incidents and aggregate them in JS here for speed.
+  // In a real production system, this could be a Postgres materialized view or SQL aggregation.
+  const { data: incidents, error } = await supabase
+    .from("incidents")
+    .select("id, status, ai_confidence_score, ai_evaluation_status, created_at")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return (
+      <PageContainer title="AI Performance">
+        <p className="text-red-500">Error loading metrics data.</p>
+      </PageContainer>
+    );
+  }
+
+  const validIncidents = incidents || [];
+
+  // Group 1: Accuracy (Approved vs Rejected/Disputed vs Pending)
+  // For AI, approved/signed = HR accepted AI. rejected/disputed = HR override.
+  const accuracyMap = {
+    Accurate: 0,
+    Overridden: 0,
+    Pending: 0,
+  };
+
+  // Group 2: Volume over time (groupby day)
+  const volumeMap: Record<string, number> = {};
+
+  // Group 3: Confidence over time (groupby day)
+  const confidenceMap: Record<string, { total: number; count: number }> = {};
+
+  for (const inc of validIncidents) {
+    // 1. Accuracy
+    if (["approved", "signed", "document_delivered", "meeting_scheduled"].includes(inc.status)) {
+      accuracyMap.Accurate += 1;
+    } else if (["rejected", "disputed"].includes(inc.status)) {
+      accuracyMap.Overridden += 1;
+    } else {
+      accuracyMap.Pending += 1;
+    }
+
+    const date = new Date(inc.created_at).toISOString().split("T")[0];
+    
+    // 2. Volume
+    volumeMap[date] = (volumeMap[date] || 0) + 1;
+
+    // 3. Confidence
+    if (inc.ai_confidence_score != null) {
+      if (!confidenceMap[date]) {
+        confidenceMap[date] = { total: 0, count: 0 };
+      }
+      confidenceMap[date].total += Number(inc.ai_confidence_score);
+      confidenceMap[date].count += 1;
+    }
+  }
+
+  const accuracyData = [
+    { name: "Accepted", value: accuracyMap.Accurate },
+    { name: "Overridden", value: accuracyMap.Overridden },
+    { name: "Pending", value: accuracyMap.Pending },
+  ].filter((d) => d.value > 0);
+
+  const volumeData = Object.keys(volumeMap).map((date) => ({
+    date,
+    count: volumeMap[date],
+  }));
+
+  const confidenceData = Object.keys(confidenceMap).map((date) => ({
+    date,
+    score: confidenceMap[date].total / confidenceMap[date].count,
+  }));
 
   return (
-    <PageContainer
-      title="AI Performance"
-      description="Monitor AI service usage and performance."
-    >
+    <PageContainer title="AI Performance & Analytics">
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-primary/10">
-                <Brain className="h-5 w-5 text-brand-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-text-tertiary">Total Requests</p>
-                <p className="text-2xl font-semibold text-text-primary">45.2K</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-success/10">
-                <Activity className="h-5 w-5 text-brand-success" />
-              </div>
-              <div>
-                <p className="text-sm text-text-tertiary">Success Rate</p>
-                <p className="text-2xl font-semibold text-text-primary">99.7%</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-warning/10">
-                <Clock className="h-5 w-5 text-brand-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-text-tertiary">Avg Latency</p>
-                <p className="text-2xl font-semibold text-text-primary">1.2s</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-error/10">
-                <DollarSign className="h-5 w-5 text-brand-error" />
-              </div>
-              <div>
-                <p className="text-sm text-text-tertiary">Est. Cost</p>
-                <p className="text-2xl font-semibold text-text-primary">$124</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="p-6">
-            <h3 className="mb-4 font-semibold text-text-primary">Requests by Agent</h3>
-            <div className="space-y-3">
-              {[
-                { agent: "Risk Classifier", requests: "12.4K", latency: "0.8s" },
-                { agent: "Escalation Router", requests: "8.2K", latency: "1.1s" },
-                { agent: "Disciplinary Interview", requests: "6.1K", latency: "1.4s" },
-                { agent: "Manager Coach", requests: "5.3K", latency: "1.2s" },
-                { agent: "Language Checker", requests: "3.2K", latency: "0.9s" },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between border-b border-border py-2 last:border-0"
-                >
-                  <span className="text-sm text-text-primary">{item.agent}</span>
-                  <div className="flex gap-4">
-                    <Badge variant="outline">{item.requests}</Badge>
-                    <span className="text-xs text-text-tertiary">{item.latency}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="mb-4 font-semibold text-text-primary">Error Breakdown</h3>
-            <div className="space-y-3">
-              {[
-                { error: "Rate limited", count: 12 },
-                { error: "Timeout", count: 8 },
-                { error: "Invalid response", count: 5 },
-                { error: "Circuit breaker", count: 2 },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between border-b border-border py-2 last:border-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-brand-warning" />
-                    <span className="text-sm text-text-primary">{item.error}</span>
-                  </div>
-                  <Badge variant="warning">{item.count}</Badge>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+        <p className="text-muted-foreground text-sm">
+          Analytics tracking the autonomous HR agent's performance, evaluation volume, and human-in-the-loop override rates.
+        </p>
+        <AiPerformanceCharts 
+          accuracyData={accuracyData.length > 0 ? accuracyData : [{ name: "No Data", value: 1 }]} 
+          confidenceData={confidenceData} 
+          volumeData={volumeData} 
+        />
       </div>
     </PageContainer>
   );

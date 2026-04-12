@@ -58,6 +58,24 @@ export interface DashboardMeetingItem {
 
 export type DashboardEmployeeDocumentItem = EmployeeDocumentItem;
 
+type DashboardIncidentRow = {
+  id: string;
+  employee_id: string | null;
+  reference_number?: string | null;
+  status: string;
+  created_at: string;
+  type?: string;
+  severity?: string;
+  ai_confidence_score?: number | null;
+};
+
+type DashboardMeetingRow = {
+  id: string;
+  disciplinary_action_id: string | null;
+  type: string;
+  scheduled_at: string | null;
+};
+
 const OPEN_INCIDENT_STATUS_FILTER = "(closed,signed)";
 
 export async function getDashboardSummary(
@@ -287,10 +305,10 @@ export async function getDashboardSummary(
     ]),
   );
   const pendingDocuments = employeeDocuments.filter(
-    (document) => document.status === "pending_signature",
+    (document: EmployeeDocumentItem) => document.status === "pending_signature",
   );
   const signedDocuments = employeeDocuments.filter(
-    (document) => document.status === "signed",
+    (document: EmployeeDocumentItem) => document.status === "signed",
   );
 
   return {
@@ -310,7 +328,7 @@ export async function getDashboardSummary(
     aiEvaluatingCount: aiEvaluatingResult.count ?? 0,
     meetingsTodayCount: meetingsTodayResult.count ?? 0,
     awaitingSignatureCount: awaitingSignatureResult.count ?? 0,
-    recentReports: (recentReportsResult.data ?? []).map((report) => ({
+    recentReports: ((recentReportsResult.data ?? []) as DashboardIncidentRow[]).map((report) => ({
       id: report.id as string,
       reference: (report.reference_number as string) ?? "Incident",
       employeeName:
@@ -319,7 +337,7 @@ export async function getDashboardSummary(
       status: report.status as string,
       createdAt: report.created_at as string,
     })),
-    pendingReviews: (pendingReviewsDataResult.data ?? []).map((review) => ({
+    pendingReviews: ((pendingReviewsDataResult.data ?? []) as DashboardIncidentRow[]).map((review) => ({
       id: review.id as string,
       employeeName:
         reviewEmployeeNames.get((review.employee_id as string) ?? "") ??
@@ -332,7 +350,7 @@ export async function getDashboardSummary(
           : Number(review.ai_confidence_score),
       createdAt: review.created_at as string,
     })),
-    upcomingMeetings: (upcomingMeetingsResult.data ?? []).map((meeting) => {
+    upcomingMeetings: ((upcomingMeetingsResult.data ?? []) as DashboardMeetingRow[]).map((meeting) => {
       const employeeId = actionEmployeeIds.get(
         (meeting.disciplinary_action_id as string) ?? "",
       );

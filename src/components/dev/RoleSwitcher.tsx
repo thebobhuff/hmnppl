@@ -5,8 +5,8 @@
 
 "use client";
 
-import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
 import type { UserRole } from "@/types";
 
 const ROLES: { role: UserRole; label: string; color: string }[] = [
@@ -19,7 +19,22 @@ const ROLES: { role: UserRole; label: string; color: string }[] = [
 
 export function RoleSwitcher() {
   const currentRole = useAuthStore((s) => s.user?.role);
-  const loginAs = useAuthStore((s) => s.loginAs);
+  const setUser = useAuthStore((s) => s.setUser);
+
+  const loginAs = async (role: UserRole) => {
+    // Generate a proper deterministic fake login payload
+    await setUser({
+      id: `dev-${role.toLowerCase()}`,
+      email: `dev+${role.toLowerCase()}@example.com`,
+      first_name: "Dev",
+      last_name: role,
+      role: role,
+      company_id: "dev-company-1",
+      department_id: "dev-dept-1",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any);
+  };
 
   return (
     <div className="card">
