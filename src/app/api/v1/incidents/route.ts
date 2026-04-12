@@ -12,6 +12,7 @@ import {
   listIncidents,
   getDirectReports,
 } from "@/lib/services/incident-service";
+import { runAIPipeline } from "@/lib/agents/pipeline";
 import {
   incidentCreateSchema,
   incidentListFiltersSchema,
@@ -92,7 +93,26 @@ export const POST = withAuth({ roles: roleGuards.manager }, async (request) => {
       parsed.data,
     );
 
-    return NextResponse.json(
+    // Fire AI pipeline asynchronously (non-blocking)
+  // The pipeline updates the incident in DB when complete
+  runAIPipeline({
+    incidentId: incident.id,
+    companyId,
+    employeeId,
+    incidentType: parsed.data.type,
+    description: parsed.data.description,
+    severity: parsed.data.severity,
+    incidentDate: parsed.data.incident_date,
+    referenceNumber,
+    previousIncidentCount: incident.previous_incident_count ?? 0,
+    policySnapshot: (incident.policy_snapshot as Record<string, unknown>[]) ?? [],
+    employeeName: undefined, // Will be fetched by pipeline if needed
+  }).catch((pipelineErr) => {
+    console.error("[incidents:create] AI pipeline failed (non-fatal):", pipelineErr);
+    // Pipeline failure doesn't affect incident creation — it stays in ai_evaluating
+  });
+
+  return NextResponse.json(
       {
         incident: {
           id: incident.id,
