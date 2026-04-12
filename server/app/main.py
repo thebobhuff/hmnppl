@@ -1,4 +1,4 @@
-"""FastAPI application entry point.
+﻿"""FastAPI application entry point.
 
 Creates the application instance, registers middleware (CORS, request ID,
 rate limiting, request size limits), includes routers, and initialises
@@ -19,13 +19,15 @@ from app.core.logging import get_logger, setup_logging
 from app.core.rate_limit import TIER_AI, TIER_STANDARD, RateLimiter
 from app.core.security import create_request_size_middleware
 from app.routers import agents, ai, health
+from app.routers.wave6_agents import router as wave6_router
+from app.routers.compliance import router as compliance_router
 
 # ---- Lifespan ----
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan handler — runs on startup and shutdown."""
+    """Application lifespan handler â€” runs on startup and shutdown."""
     settings = get_settings()
     setup_logging(level=settings.LOG_LEVEL)
     logger = get_logger(__name__)
@@ -45,7 +47,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="AI HR Platform — AI Service",
+        title="AI HR Platform â€” AI Service",
         version="0.1.0",
         description=(
             "Python micro-service providing AI-powered HR features: "
@@ -73,7 +75,7 @@ def create_app() -> FastAPI:
         )
         return response
 
-    # CORS — locked to configured origins only
+    # CORS â€” locked to configured origins only
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -82,17 +84,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Rate limiting — tiered by route prefix
+    # Rate limiting â€” tiered by route prefix
     rate_limiter = RateLimiter()
     rate_limiter.configure("/ai", TIER_AI)
     rate_limiter.configure("", TIER_STANDARD)  # default fallback
     rate_limiter.add_to(app)
 
-    # Request size limits — reject oversized payloads
+    # Request size limits â€” reject oversized payloads
     size_limiter = create_request_size_middleware()
     size_limiter.add_to(app)
 
-    # Request-ID — attach a unique identifier to every request
+    # Request-ID â€” attach a unique identifier to every request
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
         """Inject a ``X-Request-ID`` header for distributed tracing."""
@@ -106,9 +108,12 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(ai.router)
     app.include_router(agents.router)
+    app.include_router(wave6_router)
+    app.include_router(compliance_router)
 
     return app
 
 
 # Module-level app instance for uvicorn
 app = create_app()
+

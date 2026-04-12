@@ -6,8 +6,14 @@ import {
   Shield,
   FileSignature,
   BarChart3,
-  CheckCircle2,
-  Sparkles,
+  Brain,
+  Scale,
+  AlertTriangle,
+  Users,
+  TrendingUp,
+  FileCheck,
+  MessageSquare,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -16,39 +22,66 @@ import Link from "next/link";
 const features = [
   {
     icon: Bot,
-    title: "AI Autonomous Agents",
+    title: "AI Progressive Discipline",
     description:
-      "Deploy intelligent agents that automate recruitment screening, onboarding workflows, and employee support around the clock.",
+      "Autonomous agents track verbal warnings through PIPs, ensuring consistent escalation. No skipped steps, no legal gaps.",
+    href: "/features/discipline-tracking",
   },
   {
-    icon: Shield,
-    title: "Policy Engine",
+    icon: Brain,
+    title: "Manager Coaching AI",
     description:
-      "Centralized policy management with automated enforcement, version control, and real-time compliance monitoring.",
+      "Real-time coaching for difficult conversations. Suggested language, tone guidance, and empathy training before every meeting.",
+    href: "/features/manager-coaching",
+  },
+  {
+    icon: Scale,
+    title: "Multi-Layer Compliance",
+    description:
+      "Country, state, county, and city labor laws merged automatically. Termination paperwork generated for every jurisdiction you operate in.",
+    href: "/features/compliance-engine",
   },
   {
     icon: FileSignature,
-    title: "E-Signatures",
+    title: "AI Document Generation",
     description:
-      "Legally binding electronic signatures for contracts, offer letters, and policy acknowledgments with full audit trails.",
+      "Generate legally reviewed discipline documents, warnings, PIPs, and termination packages. E-signature built in with full audit trails.",
+    href: "#features",
   },
   {
     icon: BarChart3,
-    title: "HR Analytics",
+    title: "HR KPIs and Churn Analytics",
     description:
-      "Real-time dashboards and predictive insights on attrition risk, hiring velocity, diversity metrics, and workforce costs.",
+      "Turnover rate, retention metrics, department health scores, tenure distribution, and new-hire churn. See org health in one dashboard.",
+    href: "/features/analytics",
   },
   {
-    icon: CheckCircle2,
-    title: "Compliance Ready",
+    icon: AlertTriangle,
+    title: "Auto-Escalation Guardrails",
     description:
-      "Built-in compliance frameworks for GDPR, EEOC, SOX, and more with automated audit trails and reporting.",
+      "Safety violations, harassment, and protected class incidents bypass the agent loop and escalate directly to HR. No delays.",
+    href: "#features",
   },
   {
-    icon: Sparkles,
-    title: "Premium Dark Design",
+    icon: MessageSquare,
+    title: "Agent Pushback Logic",
     description:
-      "Beautiful, accessible dark-mode interface designed for modern HR teams who spend hours in the platform daily.",
+      "The AI challenges disproportionate requests. If a manager wants to terminate for a first offense, the agent pushes back with alternatives.",
+    href: "#features",
+  },
+  {
+    icon: Users,
+    title: "Training Gap Detection",
+    description:
+      "AI identifies patterns across incidents. Five employees with the same issue? The system flags a training gap, not a people problem.",
+    href: "/features/training-gaps",
+  },
+  {
+    icon: TrendingUp,
+    title: "Organization Health Score",
+    description:
+      "A single number reflecting your disciplinary health. Pattern recognition, department comparisons, and proactive recommendations.",
+    href: "/features/org-health",
   },
 ] as const;
 
@@ -58,19 +91,12 @@ const easeOut: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
+  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: easeOut },
-  },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: easeOut } },
 };
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -78,7 +104,7 @@ const cardVariants: Variants = {
 export default function FeatureGrid() {
   return (
     <section id="features" className="mx-auto max-w-7xl px-6 py-24">
-      {/* ── Section heading ────────────────────────────────────────────── */}
+      {/* Section heading */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -87,15 +113,16 @@ export default function FeatureGrid() {
         className="mb-16 text-center"
       >
         <h2 className="font-display text-3xl font-bold text-text-primary sm:text-4xl lg:text-5xl">
-          Everything You Need to <span className="text-brand-primary">Manage HR</span>
+          Everything You Need for{" "}
+          <span className="text-brand-primary">Employee Discipline</span>
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-text-secondary">
-          A complete suite of AI-powered tools to transform your human resources
-          operations from reactive to proactive.
+          The only platform with autonomous AI agents that handle discipline workflows end-to-end,
+          from incident intake to document generation to compliance enforcement.
         </p>
       </motion.div>
 
-      {/* ── Feature cards ──────────────────────────────────────────────── */}
+      {/* Feature cards */}
       <motion.div
         className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         variants={containerVariants}
@@ -111,32 +138,18 @@ export default function FeatureGrid() {
               variants={cardVariants}
               className="group relative rounded-2xl border border-brand-slate-light bg-brand-slate p-8 shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-primary hover:shadow-[0_0_30px_rgba(255,217,0,0.15)]"
             >
-              {/* Icon */}
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary transition-colors group-hover:bg-brand-primary/20">
                 <Icon className="h-6 w-6" />
               </div>
-
-              {/* Title */}
-              <h3 className="mb-2 text-xl font-bold text-text-primary">
-                {feature.title}
-              </h3>
-
-              {/* Description */}
-              <p className="mb-4 text-sm leading-relaxed text-text-secondary">
-                {feature.description}
-              </p>
-
-              {/* Learn more link */}
+              <h3 className="mb-2 text-xl font-bold text-text-primary">{feature.title}</h3>
+              <p className="mb-4 text-sm leading-relaxed text-text-secondary">{feature.description}</p>
               <Link
-                href="#features"
+                href={feature.href}
                 className="inline-flex items-center text-sm font-medium text-brand-primary transition-colors hover:text-brand-primary-dim"
               >
                 Learn more
-                <span
-                  className="ml-1 inline-block transition-transform group-hover:translate-x-1"
-                  aria-hidden="true"
-                >
-                  →
+                <span className="ml-1 inline-block transition-transform group-hover:translate-x-1" aria-hidden="true">
+                  &rarr;
                 </span>
               </Link>
             </motion.article>

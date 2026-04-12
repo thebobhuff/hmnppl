@@ -1,4 +1,4 @@
-"""Prompt templates for all agent sub-agents.
+﻿"""Prompt templates for all agent sub-agents.
 
 Each agent has a system prompt (immutable, server-controlled) and a user prompt
 template (structured data payload). This prevents prompt injection.
@@ -30,7 +30,7 @@ CRITICAL RULES:
   - Any incident involving protected class characteristics (age, race, gender, religion, disability, national origin, sexual orientation)
 - High-risk incidents should be flagged even if they don't require immediate bypass
 - NEVER recommend that high-risk incidents be handled by the automated agent alone
-- Your assessment protects the business — err on the side of caution
+- Your assessment protects the business â€” err on the side of caution
 - Do NOT include or reference any protected characteristics in your output
 
 Respond with valid JSON only."""
@@ -52,9 +52,9 @@ RISK_CLASSIFIER_USER_TEMPLATE = """Classify the risk level for the following inc
 {{
   "risk_level": "low|medium|high|critical",
   "bypasses_agent": true/false,
-  "bypass_reason": "string or null — explain why it bypasses the agent loop",
+  "bypass_reason": "string or null â€” explain why it bypasses the agent loop",
   "risk_factors": ["list of specific risk factors identified"],
-  "recommended_action": "string — what should happen next",
+  "recommended_action": "string â€” what should happen next",
   "confidence": 0.0-1.0
 }}"""
 
@@ -104,9 +104,9 @@ ESCALATION LEVELS:
 - immediate_hr_escalation: Safety, violence, harassment, financial crimes. Bypass agent entirely.
 
 PROGRESSIVE DISCIPLINE RULES:
-- Track the employee's history — same-type incidents should escalate
+- Track the employee's history â€” same-type incidents should escalate
 - Different-type incidents may still indicate a pattern
-- Consider training gaps — if the employee was never trained on the expected behavior, note it
+- Consider training gaps â€” if the employee was never trained on the expected behavior, note it
 - The agent should coach the manager on appropriate language for verbal warnings
 - For new issue types the manager hasn't handled before, flag for coaching
 
@@ -202,7 +202,7 @@ Your role is to conduct an automated initial interview for employee disciplinary
 
 INTERVIEW FLOW:
 - Step 1 (Introduction): Set context, explain the purpose, establish a professional tone
-- Step 2 (Incident Description): Gather detailed facts — what happened, when, where, who was involved
+- Step 2 (Incident Description): Gather detailed facts â€” what happened, when, where, who was involved
 - Step 3 (Employee Response): Document the employee's side of the story
 - Step 4 (Prior Context): Review any prior incidents or patterns
 - Step 5 (Training Review): Check what training the employee has received, identify gaps
@@ -218,7 +218,7 @@ COACHING PRINCIPLES:
 RULES:
 - For verbal warnings: the agent handles the full interview without HR review
 - For written warnings or higher: flag that HR review is required
-- NEVER recommend termination — that is exclusively an HR decision
+- NEVER recommend termination â€” that is exclusively an HR decision
 - Keep language professional, calm, and supportive
 - Avoid any language that could be construed as discriminatory
 
@@ -273,7 +273,7 @@ def build_disciplinary_interview_prompt(
     prior_str = (
         json.dumps(prior_responses, indent=2)
         if prior_responses
-        else "No prior responses — this is a new session."
+        else "No prior responses â€” this is a new session."
     )
 
     user_prompt = DISCIPLINARY_INTERVIEW_USER_TEMPLATE.format(
@@ -309,7 +309,7 @@ Your role is to coach managers on how to handle disciplinary conversations effec
 7. RISK WARNINGS: Any legal or compliance risks the manager should be aware of
 
 COACHING PHILOSOPHY:
-- Managers are not HR experts — they need clear, practical guidance
+- Managers are not HR experts â€” they need clear, practical guidance
 - The goal is correction, not punishment
 - Documentation today protects the business tomorrow
 - Every conversation is a training opportunity
@@ -410,11 +410,11 @@ REVIEW CRITERIA:
 - Defensibility: Would this document hold up in a legal proceeding?
 
 RULES:
-- Flag ANY mention of protected characteristics — even positive ones
+- Flag ANY mention of protected characteristics â€” even positive ones
 - Flag emotional language (angry, frustrated, disappointed, etc. when describing employee)
 - Flag vague accusations without specific evidence
 - Flag any language that suggests bias or personal animus
-- Be thorough — HR's job is to protect the business
+- Be thorough â€” HR's job is to protect the business
 
 Respond with valid JSON only."""
 
@@ -464,3 +464,15 @@ def build_language_checker_prompt(
         {"role": "system", "content": LANGUAGE_CHECKER_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
     ]
+
+
+# ============================================================================
+# Wave 6: Lijo Feature Gap Prompts (imported from wave6_prompts module)
+# ============================================================================
+
+from app.agents.wave6_prompts import (  # noqa: E402,F401
+    build_issue_similarity_prompt,
+    build_training_gap_prompt,
+    build_continuous_improvement_prompt,
+    build_pushback_prompt,
+)

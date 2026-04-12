@@ -1,4 +1,4 @@
-"""Pydantic schemas for the agent layer endpoints."""
+﻿"""Pydantic schemas for the agent layer endpoints."""
 
 from __future__ import annotations
 
@@ -178,3 +178,118 @@ class LanguageCheckerResponse(BaseModel):
     protected_class_mentions: List[str] = Field(default_factory=list)
     suggestions: List[str] = Field(default_factory=list)
     is_legally_sound: bool
+
+
+# ---- Wave 6: Lijo Feature Gap Schemas ----
+
+
+# Issue Similarity (L-002)
+
+class IssueSimilarityRequest(BaseModel):
+    incident_type: IncidentType
+    incident_description: str = Field(..., min_length=10, max_length=10000)
+    employee_history: Optional[List[Dict[str, Any]]] = Field(default=None)
+    policy_context: Optional[Dict[str, Any]] = Field(default=None)
+
+
+class MatchedIncident(BaseModel):
+    prior_incident_type: str
+    date: str
+    similarity_reason: str
+
+
+class IssueSimilarityResponse(BaseModel):
+    is_repeat_issue: bool
+    is_same_category: bool
+    similarity_score: float = Field(ge=0.0, le=1.0)
+    matched_incidents: List[MatchedIncident] = Field(default_factory=list)
+    progression_analysis: str
+    recommended_track: str
+    training_relevant: bool
+    training_topic: Optional[str] = Field(default=None)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+# Training Gap (L-003)
+
+class TrainingGapRequest(BaseModel):
+    incidents: List[Dict[str, Any]] = Field(..., min_length=1)
+    training_catalog: Optional[List[Dict[str, Any]]] = Field(default=None)
+    department: Optional[str] = Field(default=None)
+    time_window_days: int = Field(default=90, ge=7, le=365)
+
+
+class TrainingGapItem(BaseModel):
+    gap_area: str
+    incident_types: List[str] = Field(default_factory=list)
+    affected_count: int
+    priority: str
+    recommended_training: str
+    estimated_impact: str
+
+
+class TrainingGapResponse(BaseModel):
+    gaps_found: bool
+    training_gaps: List[TrainingGapItem] = Field(default_factory=list)
+    systemic_issues: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    affected_departments: List[str] = Field(default_factory=list)
+    priority_level: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+# Continuous Improvement (L-007)
+
+class ContinuousImprovementRequest(BaseModel):
+    incidents: Optional[List[Dict[str, Any]]] = Field(default=None)
+    policies: Optional[List[Dict[str, Any]]] = Field(default=None)
+    manager_stats: Optional[List[Dict[str, Any]]] = Field(default=None)
+    training_gaps: Optional[List[Dict[str, Any]]] = Field(default=None)
+    org_health: Optional[Dict[str, Any]] = Field(default=None)
+
+
+class InsightItem(BaseModel):
+    insight: str
+    evidence: str
+    impact: str
+    type: str
+
+
+class PriorityAction(BaseModel):
+    action: str
+    timeline: str
+    effort: str
+    expected_impact: str
+
+
+class ContinuousImprovementResponse(BaseModel):
+    insights: List[InsightItem] = Field(default_factory=list)
+    process_recommendations: List[str] = Field(default_factory=list)
+    policy_recommendations: List[str] = Field(default_factory=list)
+    manager_recommendations: List[str] = Field(default_factory=list)
+    overall_assessment: str
+    priority_actions: List[PriorityAction] = Field(default_factory=list)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+# Manager Pushback (L-009)
+
+class ManagerPushbackRequest(BaseModel):
+    requested_action: str = Field(..., min_length=3, max_length=200)
+    incident_type: IncidentType
+    incident_description: str = Field(..., min_length=10, max_length=10000)
+    employee_history: Optional[List[Dict[str, Any]]] = Field(default=None)
+    policy_context: Optional[Dict[str, Any]] = Field(default=None)
+    manager_notes: Optional[str] = Field(default=None, max_length=5000)
+
+
+class ManagerPushbackResponse(BaseModel):
+    is_appropriate: bool
+    proportionality_score: float = Field(ge=0.0, le=1.0)
+    pushback_required: bool
+    pushback_message: str
+    suggested_alternative: str
+    reasoning: str
+    legal_risk_flag: bool
+    progressive_discipline_step: str
+    confidence: float = Field(ge=0.0, le=1.0)
