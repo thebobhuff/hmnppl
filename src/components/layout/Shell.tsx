@@ -6,11 +6,13 @@
 
 "use client";
 
-import { useEffect } from "react";
-import { useAuthStore } from "@/stores/auth-store";
+import { ConversationalHelpdesk } from "@/components/domain/ConversationalHelpdesk";
 import { BreadcrumbProvider } from "@/hooks/use-breadcrumbs";
-import { Sidebar } from "./Sidebar";
+import { usersAPI } from "@/lib/api/client";
+import { useAuthStore } from "@/stores/auth-store";
+import { useEffect } from "react";
 import { Header } from "./Header";
+import { Sidebar } from "./Sidebar";
 
 /**
  * Authenticated app shell.
@@ -33,15 +35,30 @@ import { Header } from "./Header";
  * ```
  */
 export function Shell({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const loginAs = useAuthStore((s) => s.loginAs);
+  const setUser = useAuthStore((s) => s.setUser);
 
-  // Auto-login for development (will be replaced by Supabase auth guard)
   useEffect(() => {
-    if (!isAuthenticated) {
-      loginAs("COMPANY_ADMIN");
+    let cancelled = false;
+
+    async function hydrateUser() {
+      try {
+        const data = await usersAPI.me();
+        if (!cancelled) {
+          setUser(data.user);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+        }
+      }
     }
-  }, [isAuthenticated, loginAs]);
+
+    hydrateUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setUser]);
 
   return (
     <BreadcrumbProvider>
@@ -49,6 +66,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <Header />
         {children}
+        <ConversationalHelpdesk />
       </div>
     </BreadcrumbProvider>
   );

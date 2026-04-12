@@ -21,32 +21,31 @@ Run:
 
 from __future__ import annotations
 
-import pytest
 import psycopg2
 import psycopg2.extras
+import pytest
 
-from tests.conftest import connection_as, clean_test_data
+from tests.conftest import clean_test_data, connection_as
 from tests.fixtures.tenants import (
-    two_companies_fixture,
-    CO_A_ID,
-    CO_B_ID,
     CO_A_ADMIN_ID,
-    CO_A_HR_ID,
-    CO_A_MGR1_ID,
-    CO_A_MGR2_ID,
+    CO_A_DOC_ID,
     CO_A_EMP1_ID,
     CO_A_EMP2_ID,
     CO_A_EMP3_ID,
     CO_A_EMP4_ID,
-    CO_A_POLICY1_ID,
-    CO_A_POLICY2_ID,
+    CO_A_HR_ID,
+    CO_A_ID,
     CO_A_INC1_ID,
     CO_A_INC2_ID,
     CO_A_INC3_ID,
-    CO_A_DOC_ID,
+    CO_A_MGR1_ID,
+    CO_A_MGR2_ID,
+    CO_A_POLICY1_ID,
+    CO_A_POLICY2_ID,
+    CO_B_ID,
     SUPER_ADMIN_ID,
+    two_companies_fixture,
 )
-
 
 # ---------------------------------------------------------------------------
 # Session-scoped fixture: create tenants once, clean up after session
@@ -226,9 +225,9 @@ class TestEmployeeRole:
                 "id = %s",
                 (CO_A_ID,),
             )
-            assert affected == 0, (
-                "Employee should NOT be able to UPDATE company settings"
-            )
+            assert (
+                affected == 0
+            ), "Employee should NOT be able to UPDATE company settings"
             conn.close()
 
     def test_cannot_create_departments(self, tenants):
@@ -349,9 +348,9 @@ class TestManagerRole:
                 "id = %s AND reported_by = %s",
                 (CO_A_INC1_ID, CO_A_MGR1_ID),
             )
-            assert affected >= 1, (
-                "Manager should be able to update incidents they reported"
-            )
+            assert (
+                affected >= 1
+            ), "Manager should be able to update incidents they reported"
             conn.close()
 
     def test_cannot_create_policies(self, tenants):
@@ -380,9 +379,9 @@ class TestManagerRole:
                 "id = %s",
                 (CO_A_ID,),
             )
-            assert affected == 0, (
-                "Manager should NOT be able to UPDATE company settings"
-            )
+            assert (
+                affected == 0
+            ), "Manager should NOT be able to UPDATE company settings"
             conn.close()
 
     def test_cannot_create_departments(self, tenants):
@@ -432,9 +431,9 @@ class TestManagerRole:
         ) as conn:
             for table in ["users", "incidents", "documents", "policies"]:
                 count = _can_select(conn, table, "company_id = %s", (CO_B_ID,))
-                assert count == 0, (
-                    f"Manager can see {count} rows in {table} from Company B"
-                )
+                assert (
+                    count == 0
+                ), f"Manager can see {count} rows in {table} from Company B"
             conn.close()
 
 
@@ -576,9 +575,9 @@ class TestHRAgentRole:
                 "id = %s",
                 (disc_act["id"],),
             )
-            assert affected >= 1, (
-                "HR Agent should be able to UPDATE disciplinary_actions"
-            )
+            assert (
+                affected >= 1
+            ), "HR Agent should be able to UPDATE disciplinary_actions"
             conn.close()
 
     def test_cannot_update_company_settings(self, tenants):
@@ -593,9 +592,9 @@ class TestHRAgentRole:
                 "id = %s",
                 (CO_A_ID,),
             )
-            assert affected == 0, (
-                "HR Agent should NOT be able to UPDATE company settings"
-            )
+            assert (
+                affected == 0
+            ), "HR Agent should NOT be able to UPDATE company settings"
             conn.close()
 
     def test_cannot_read_audit_log(self, tenants):
@@ -620,9 +619,9 @@ class TestHRAgentRole:
                 "disciplinary_actions",
             ]:
                 count = _can_select(conn, table, "company_id = %s", (CO_B_ID,))
-                assert count == 0, (
-                    f"HR Agent can see {count} rows in {table} from Company B"
-                )
+                assert (
+                    count == 0
+                ), f"HR Agent can see {count} rows in {table} from Company B"
             conn.close()
 
     def test_can_read_policy_versions(self, tenants):
@@ -692,9 +691,9 @@ class TestCompanyAdminRole:
                 "id = %s",
                 (CO_A_ID,),
             )
-            assert affected == 1, (
-                "Company admin should be able to UPDATE company settings"
-            )
+            assert (
+                affected == 1
+            ), "Company admin should be able to UPDATE company settings"
             conn.close()
 
     def test_can_update_company_subscription(self, tenants):
@@ -789,9 +788,9 @@ class TestCompanyAdminRole:
                 "meetings",
             ]:
                 count = _can_select(conn, table, "company_id = %s", (CO_B_ID,))
-                assert count == 0, (
-                    f"Company admin sees {count} rows in {table} from Company B"
-                )
+                assert (
+                    count == 0
+                ), f"Company admin sees {count} rows in {table} from Company B"
 
             # Also cannot update Company B
             affected = _can_update(
@@ -801,9 +800,9 @@ class TestCompanyAdminRole:
                 "id = %s",
                 (CO_B_ID,),
             )
-            assert affected == 0, (
-                "Company admin should NOT be able to update other company"
-            )
+            assert (
+                affected == 0
+            ), "Company admin should NOT be able to update other company"
             conn.close()
 
     def test_can_approve_disciplinary_actions(self, tenants):
@@ -819,9 +818,9 @@ class TestCompanyAdminRole:
                 "id = %s",
                 (CO_A_ADMIN_ID, disc_act["id"]),
             )
-            assert affected >= 1, (
-                "Company admin should be able to approve disciplinary actions"
-            )
+            assert (
+                affected >= 1
+            ), "Company admin should be able to approve disciplinary actions"
             conn.close()
 
 
@@ -1094,8 +1093,14 @@ def test_rbac_matrix_insert(
             "INSERT INTO documents (company_id, type, title, content, status, version) "
             "VALUES (%s, 'matrix_test', 'Matrix Doc', 'content', 'draft', 1)"
         ),
-        "disciplinary_actions": None,  # Needs FK to existing incident, skip in matrix
-        "meetings": None,  # Needs FK to disciplinary_action, skip in matrix
+        "disciplinary_actions": (
+            "INSERT INTO disciplinary_actions (company_id, incident_id, type, status, recommended_action, rationale, level) "
+            "VALUES (%s, (SELECT id FROM incidents WHERE company_id = %s LIMIT 1), 'written_warning', 'draft', 'None', 'matrix test', 1)"
+        ),
+        "meetings": (
+            "INSERT INTO meetings (company_id, disciplinary_action_id, status, title, meeting_date, location) "
+            "VALUES (%s, (SELECT id FROM disciplinary_actions WHERE company_id = %s AND status = 'draft' LIMIT 1), 'scheduled', 'matrix test meeting', '2026-05-01', 'Zoom')"
+        ),
     }
 
     sql = insert_sqls.get(resource)
@@ -1105,15 +1110,17 @@ def test_rbac_matrix_insert(
     with connection_as(user_id=user_id, company_id=CO_A_ID, role=role) as conn:
         if resource == "incidents":
             result = _can_insert(conn, sql, (CO_A_ID, user_id, user_id))
+        elif resource in ("disciplinary_actions", "meetings"):
+            result = _can_insert(conn, sql, (CO_A_ID, CO_A_ID))
         else:
             result = _can_insert(conn, sql, (CO_A_ID,))
 
         if can_insert:
             assert result is True, f"{role} should be able to INSERT into {resource}"
         else:
-            assert result is False, (
-                f"{role} should NOT be able to INSERT into {resource}"
-            )
+            assert (
+                result is False
+            ), f"{role} should NOT be able to INSERT into {resource}"
         conn.close()
 
 
@@ -1164,7 +1171,7 @@ def test_rbac_matrix_update(
         if can_update:
             assert affected >= 0, f"{role} should be able to UPDATE {resource}"
         else:
-            assert affected == 0, (
-                f"{role} should NOT be able to UPDATE {resource} (got {affected} affected)"
-            )
+            assert (
+                affected == 0
+            ), f"{role} should NOT be able to UPDATE {resource} (got {affected} affected)"
         conn.close()

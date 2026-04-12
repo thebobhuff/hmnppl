@@ -14,10 +14,10 @@
  *   Layer 2 (API withAuth HOF): fine-grained DB-verified role check
  *   Layer 3 (PostgreSQL RLS): row-level tenant isolation
  */
+import { checkRoutePermission } from "@/lib/auth/permissions";
+import { getSessionTimeouts, type UserRole } from "@/lib/auth/session";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getSessionTimeouts, type UserRole } from "@/lib/auth/session";
-import { checkRoutePermission } from "@/lib/auth/permissions";
 
 // ---------------------------------------------------------------------------
 // Security headers
@@ -51,12 +51,20 @@ const SECURITY_HEADERS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /** Routes that do not require authentication. */
-const PUBLIC_ROUTES = ["/", "/login", "/signup", "/auth/callback"];
+const PUBLIC_ROUTES = [
+  "/",
+  "/pricing",
+  "/login",
+  "/signup",
+  "/auth/callback",
+  "/api/v1/csrf-token",
+];
 
 /** Cookie names for session timeout tracking. */
 const COOKIE_SESSION_START = "hr_session_start";
 const COOKIE_LAST_ACTIVITY = "hr_last_activity";
 const COOKIE_USER_ROLE = "hr_user_role";
+const COOKIE_ONBOARDING_STATUS = "hr_onboarding_completed";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -105,7 +113,7 @@ function setSessionCookie(
     value,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     ...(maxAgeSeconds !== undefined ? { maxAge: maxAgeSeconds } : {}),
   });
@@ -154,7 +162,7 @@ export async function middleware(request: NextRequest) {
               ...options,
               httpOnly: true,
               secure: process.env.NODE_ENV === "production",
-              sameSite: "strict",
+              sameSite: "lax",
               path: "/",
             });
           });
@@ -183,7 +191,32 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  // 5. Authenticated user — Layer 1 RBAC: role-based route protection ----------
+  // 5. Authenticated user — Onboarding Enforcement ------------------------------
+  if (user && !isPublicRoute(pathname)) {
+    const onboardingStatus = getCookieString(request, COOKIE_ONBOARDING_STATUS);
+
+    // Allow access to the onboarding page AND its corresponding API route
+    const onboardingSafePaths = ["/onboarding", "/api/v1/companies/onboarding"];
+    const isSafePath = onboardingSafePaths.includes(pathname);
+
+    if (onboardingStatus === "0" && !isSafePath && !pathname.startsWith("/_next/")) {
+      // Must complete onboarding first
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/onboarding";
+      const redirectResponse = NextResponse.redirect(redirectUrl);
+      applySecurityHeaders(redirectResponse);
+      return redirectResponse;
+    } else if (onboardingStatus === "1" && pathname === "/onboarding") {
+      // Already completed onboarding, skip wizard
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/dashboard";
+      const redirectResponse = NextResponse.redirect(redirectUrl);
+      applySecurityHeaders(redirectResponse);
+      return redirectResponse;
+    }
+  }
+
+  // 6. Authenticated user — Layer 1 RBAC: role-based route protection ----------
   //    Uses the cached role cookie for a fast, coarse-grained check.
   //    If the cookie is missing, we allow through — Layer 2 (API) or the
   //    page component's requireRole() will enforce with a fresh DB query.
@@ -216,7 +249,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 6. Authenticated user — enforce session timeouts ----------------------------
+  // 7. Authenticated user — enforce session timeouts ----------------------------
   if (user) {
     const now = Date.now();
 
@@ -255,6 +288,7 @@ export async function middleware(request: NextRequest) {
       expiredResponse.cookies.delete(COOKIE_SESSION_START);
       expiredResponse.cookies.delete(COOKIE_LAST_ACTIVITY);
       expiredResponse.cookies.delete(COOKIE_USER_ROLE);
+      expiredResponse.cookies.delete(COOKIE_ONBOARDING_STATUS);
 
       // Clear Supabase auth cookies
       const authCookies = request.cookies.getAll();
@@ -283,6 +317,12 @@ export async function middleware(request: NextRequest) {
     // Preserve the role cookie if it exists
     if (cachedRole) {
       setSessionCookie(response, COOKIE_USER_ROLE, cachedRole, 60 * 60 * 8);
+    }
+
+    // Preserve the onboarding cookie if it exists
+    const cachedOnboarding = getCookieString(request, COOKIE_ONBOARDING_STATUS);
+    if (cachedOnboarding) {
+      setSessionCookie(response, COOKIE_ONBOARDING_STATUS, cachedOnboarding, 60 * 60 * 8);
     }
   }
 

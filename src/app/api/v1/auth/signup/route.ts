@@ -9,6 +9,7 @@
  * After successful signup the client should call the login endpoint
  * (or use `supabase.auth.signInWithPassword`) to establish a session.
  */
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -46,6 +47,17 @@ type SignupInput = z.infer<typeof signupSchema>;
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
+  // Rate limiting check
+  const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
+  const { success } = checkRateLimit(`signup_${ip}`, 3, 10 * 60 * 1000); // 3 requests per 10 minutes
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many signup attempts. Please try again later." },
+      { status: 429 },
+    );
+  }
+
   // --- Parse and validate input ---
   let body: unknown;
   try {

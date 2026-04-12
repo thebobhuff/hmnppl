@@ -6,70 +6,55 @@
  */
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FileText, CheckCircle, Clock, AlertTriangle, ArrowRight } from "lucide-react";
+import { FileText, CheckCircle, Clock, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { disciplinaryAPI } from "@/lib/api/client";
 
-interface DocumentItem {
-  id: string;
-  title: string;
-  type: string;
-  status: "pending_signature" | "signed" | "disputed";
-  dueDate?: string;
-  signedAt?: string;
-  reference: string;
-}
-
-const MOCK_DOCUMENTS: DocumentItem[] = [
-  {
-    id: "1",
-    title: "Written Warning — Attendance Policy",
-    type: "Written Warning",
-    status: "pending_signature",
-    dueDate: "Apr 7, 2026",
-    reference: "INC-2026-0042",
-  },
-  {
-    id: "2",
-    title: "Verbal Warning — Workplace Conduct",
-    type: "Verbal Warning",
-    status: "signed",
-    signedAt: "Mar 10, 2026",
-    reference: "INC-2026-0028",
-  },
-  {
-    id: "3",
-    title: "Meeting Summary — Quarterly Review",
-    type: "Meeting Summary",
-    status: "signed",
-    signedAt: "Feb 15, 2026",
-    reference: "MTG-2026-0005",
-  },
-];
-
-export default function DocumentsPage() {
+export default function EmployeeDocumentsPage() {
   const breadcrumbs = usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
     { label: "My Documents" },
   ]);
 
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadDocs() {
+      try {
+        const res = await disciplinaryAPI.list(undefined, undefined, 50);
+        if (active && res.actions) {
+          setDocs(res.actions);
+        }
+      } catch (err) {
+        console.error("Failed to load documents", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadDocs();
+    return () => { active = false };
+  }, []);
+
   const pendingDocs = useMemo(
-    () => MOCK_DOCUMENTS.filter((d) => d.status === "pending_signature"),
-    [],
+    () => docs.filter((d) => d.status === "pending_signature"),
+    [docs],
   );
   const signedDocs = useMemo(
-    () => MOCK_DOCUMENTS.filter((d) => d.status === "signed"),
-    [],
+    () => docs.filter((d) => d.status === "completed" || d.status === "signed"),
+    [docs],
   );
   const disputedDocs = useMemo(
-    () => MOCK_DOCUMENTS.filter((d) => d.status === "disputed"),
-    [],
+    () => docs.filter((d) => d.status === "disputed"),
+    [docs],
   );
 
   return (
@@ -77,131 +62,130 @@ export default function DocumentsPage() {
       title="My Documents"
       description="Review and sign your disciplinary documents."
     >
-      <div className="grid gap-6">
-        {/* Pending Documents */}
-        <div>
-          <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
-            <Clock className="h-5 w-5 text-brand-warning" />
-            Pending Signature
-            {pendingDocs.length > 0 && (
-              <Badge variant="warning">{pendingDocs.length}</Badge>
-            )}
-          </h2>
-
-          {pendingDocs.length === 0 ? (
-            <Card className="p-6">
-              <EmptyState
-                title="All caught up!"
-                description="No documents are awaiting your signature."
-                icon={<CheckCircle className="h-8 w-8 text-brand-success" />}
-              />
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {pendingDocs.map((doc) => (
-                <DocumentCard key={doc.id} doc={doc} />
-              ))}
-            </div>
-          )}
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-text-tertiary" />
         </div>
-
-        {/* Disputed Documents */}
-        {disputedDocs.length > 0 && (
+      ) : (
+        <div className="grid gap-6">
+          {/* Pending Documents */}
           <div>
             <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
-              <AlertTriangle className="h-5 w-5 text-brand-error" />
-              Disputed
-              <Badge variant="error">{disputedDocs.length}</Badge>
+              <Clock className="h-5 w-5 text-brand-warning" />
+              Pending Signature
+              {pendingDocs.length > 0 && (
+                <Badge variant="warning">{pendingDocs.length}</Badge>
+              )}
             </h2>
-            <div className="grid gap-3">
-              {disputedDocs.map((doc) => (
-                <DocumentCard key={doc.id} doc={doc} />
-              ))}
-            </div>
+
+            {pendingDocs.length === 0 ? (
+              <Card className="p-6">
+                <EmptyState
+                  title="All caught up"
+                  description="You have no pending documents."
+                  icon={<FileText className="h-8 w-8" />}
+                />
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {pendingDocs.map((doc) => (
+                  <DocumentCard key={doc.id} doc={doc} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Signed Documents */}
-        <div>
-          <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
-            <CheckCircle className="h-5 w-5 text-brand-success" />
-            Signed Documents
-          </h2>
-
-          {signedDocs.length === 0 ? (
-            <Card className="p-6">
-              <EmptyState
-                title="No signed documents"
-                description="Once you sign documents, they will appear here."
-                icon={<FileText className="h-8 w-8" />}
-              />
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {signedDocs.map((doc) => (
-                <DocumentCard key={doc.id} doc={doc} />
-              ))}
+          {/* Disputed Documents */}
+          {disputedDocs.length > 0 && (
+            <div>
+              <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
+                <AlertTriangle className="h-5 w-5 text-brand-error" />
+                Disputed Documents
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {disputedDocs.map((doc) => (
+                  <DocumentCard key={doc.id} doc={doc} isDisputed />
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Signed Documents */}
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
+              <CheckCircle className="h-5 w-5 text-brand-success" />
+              Completed & Signed
+            </h2>
+            {signedDocs.length === 0 ? (
+              <p className="text-sm text-text-tertiary">No completed documents yet.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {signedDocs.map((doc) => (
+                  <DocumentCard key={doc.id} doc={doc} isSigned />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </PageContainer>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Document Card
-// ---------------------------------------------------------------------------
+function DocumentCard({
+  doc,
+  isSigned,
+  isDisputed,
+}: {
+  doc: any;
+  isSigned?: boolean;
+  isDisputed?: boolean;
+}) {
+  return (
+    <Card className="p-4 transition-colors hover:bg-card-hover">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-sm font-medium text-text-primary">{doc.action_type || "Document"}</h3>
+          <p className="mt-0.5 text-xs text-text-tertiary">
+            {doc.incident_id ? "INC-" + doc.incident_id.slice(0, 4) : "Unreferenced"}
+          </p>
+        </div>
+        {!isSigned && !isDisputed ? (
+          <Badge variant="warning">Awaiting Signature</Badge>
+        ) : isDisputed ? (
+          <Badge variant="error">Disputed</Badge>
+        ) : (
+          <Badge variant="success">Signed</Badge>
+        )}
+      </div>
 
-function DocumentCard({ doc }: { doc: DocumentItem }) {
-  const statusConfig = {
-    pending_signature: {
-      badge: "warning" as const,
-      label: "Awaiting Signature",
-      icon: <Clock className="h-4 w-4 text-brand-warning" />,
-      action: (
-        <Button asChild size="sm">
-          <Link href={`/documents/${doc.id}/sign`}>
-            Review & Sign
-            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+      <div className="mt-3 text-xs text-text-secondary">
+        {isSigned ? (
+          <span className="flex items-center gap-1 text-brand-success">
+            <CheckCircle className="h-3 w-3" />
+            Completed: {new Date(doc.updated_at).toLocaleDateString()}
+          </span>
+        ) : isDisputed ? (
+          <span className="flex items-center gap-1 text-brand-error">
+            <AlertTriangle className="h-3 w-3" />
+            Under review by HR
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-brand-warning">
+            <Clock className="h-3 w-3" />
+            Created: {new Date(doc.created_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 flex gap-2">
+        <Button asChild size="sm" variant={isSigned || isDisputed ? "outline" : "default"}>
+          <Link href={"/documents/\/view"}>
+            {isSigned || isDisputed ? "View Details" : "Sign Document"}
+            {(!isSigned && !isDisputed) && <ArrowRight className="ml-2 h-4 w-4" />}
           </Link>
         </Button>
-      ),
-    },
-    signed: {
-      badge: "success" as const,
-      label: `Signed ${doc.signedAt}`,
-      icon: <CheckCircle className="h-4 w-4 text-brand-success" />,
-      action: null,
-    },
-    disputed: {
-      badge: "error" as const,
-      label: "Disputed — Under Review",
-      icon: <AlertTriangle className="h-4 w-4 text-brand-error" />,
-      action: null,
-    },
-  };
-
-  const config = statusConfig[doc.status];
-
-  return (
-    <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-brand-slate-light">
-          {config.icon}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-text-primary">{doc.title}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="font-mono text-xs text-text-tertiary">{doc.reference}</span>
-            <Badge variant={config.badge}>{config.label}</Badge>
-          </div>
-          {doc.status === "pending_signature" && (
-            <p className="mt-1 text-xs text-brand-warning">Due: {doc.dueDate}</p>
-          )}
-        </div>
       </div>
-      {config.action}
     </Card>
   );
 }

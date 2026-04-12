@@ -4,9 +4,9 @@
  * Exchanges authorization code for tokens, verifies the user,
  * creates/updates the Supabase user profile, and establishes a session.
  */
-import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 const AZURE_AD_CLIENT_ID = process.env.AZURE_AD_CLIENT_ID ?? "";
 const AZURE_AD_CLIENT_SECRET = process.env.AZURE_AD_CLIENT_SECRET ?? "";
@@ -88,7 +88,9 @@ export async function GET(request: Request) {
 
     const { data: existingUser } = await admin
       .from("users")
-      .select("id, company_id, role, status")
+      .select(
+        "id, company_id, role, status, company:companies!company_id(onboarding_completed)",
+      )
       .eq("email", email)
       .single();
 

@@ -8,8 +8,9 @@
  * can set additional session-tracking cookies (role, session start, etc.)
  * in a single round-trip.
  */
-import { createServerClient } from "@supabase/ssr";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -29,12 +30,24 @@ const loginSchema = z.object({
 
 const COOKIE_SESSION_START = "hr_session_start";
 const COOKIE_USER_ROLE = "hr_user_role";
+const COOKIE_ONBOARDING_STATUS = "hr_onboarding_completed";
 
 // ---------------------------------------------------------------------------
 // POST handler
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
+  // Rate limiting check
+  const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
+  const { success } = checkRateLimit(`login_${ip}`, 5, 5 * 60 * 1000); // 5 requests per 5 minutes
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later." },
+      { status: 429 },
+    );
+  }
+
   // --- Parse and validate input ---
   let body: unknown;
   try {
@@ -96,7 +109,9 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: profile } = await admin
     .from("users")
-    .select("id, company_id, role, first_name, last_name, email, status")
+    .select(
+      "id, company_id, role, first_name, last_name, email, status, company:companies!company_id(onboarding_completed)",
+    )
     .eq("id", authData.user.id)
     .single();
 
@@ -140,6 +155,22 @@ export async function POST(request: Request) {
   response.cookies.set({
     name: COOKIE_USER_ROLE,
     value: profile.role,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 60 * 60 * 8, // 8 hours
+  });
+
+  const isCompanyOnboarded =
+    profile.company && !Array.isArray(profile.company)
+      ? (profile.company as unknown as { onboarding_completed: boolean })
+          .onboarding_completed
+      : false;
+
+  response.cookies.set({
+    name: COOKIE_ONBOARDING_STATUS,
+    value: isCompanyOnboarded ? "1" : "0",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",

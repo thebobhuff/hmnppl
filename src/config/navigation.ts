@@ -12,17 +12,10 @@ import type { NavItem, UserRole } from "@/types";
 
 const SUPER_ADMIN_NAV: NavItem[] = [
   {
-    key: "command-center",
-    label: "Command Center",
-    href: "/command-center",
+    key: "dashboard",
+    label: "Dashboard",
+    href: "/dashboard",
     iconName: "LayoutDashboard",
-  },
-  { key: "tenants", label: "Tenants", href: "/tenants", iconName: "Building2" },
-  {
-    key: "platform-analytics",
-    label: "Platform Analytics",
-    href: "/platform-analytics",
-    iconName: "BarChart3",
   },
   {
     key: "ai-performance",
@@ -31,15 +24,9 @@ const SUPER_ADMIN_NAV: NavItem[] = [
     iconName: "Brain",
   },
   {
-    key: "security-events",
-    label: "Security Events",
-    href: "/security-events",
-    iconName: "ShieldAlert",
-  },
-  {
-    key: "platform-settings",
-    label: "Platform Settings",
-    href: "/platform-settings",
+    key: "settings",
+    label: "Settings",
+    href: "/settings",
     iconName: "Settings",
   },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
@@ -54,11 +41,10 @@ const COMPANY_ADMIN_NAV: NavItem[] = [
   },
   { key: "team", label: "Team", href: "/team", iconName: "Users" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
-  { key: "reports", label: "Reports", href: "/reports", iconName: "BarChart3" },
   {
-    key: "company-settings",
-    label: "Company Settings",
-    href: "/company-settings",
+    key: "settings",
+    label: "Settings",
+    href: "/settings",
     iconName: "Settings",
   },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
@@ -79,14 +65,7 @@ const HR_AGENT_NAV: NavItem[] = [
     badge: 0,
   },
   { key: "meetings", label: "Meetings", href: "/meetings", iconName: "Calendar" },
-  { key: "employees", label: "Employees", href: "/employees", iconName: "Users" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
-  {
-    key: "my-reports",
-    label: "My Reports",
-    href: "/my-reports",
-    iconName: "FileBarChart",
-  },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
 ];
 
@@ -104,19 +83,6 @@ const MANAGER_NAV: NavItem[] = [
     iconName: "PlusCircle",
     isCta: true,
   },
-  {
-    key: "my-reports",
-    label: "My Reports",
-    href: "/my-reports",
-    iconName: "FileBarChart",
-  },
-  { key: "my-team", label: "My Team", href: "/my-team", iconName: "Users" },
-  {
-    key: "my-meetings",
-    label: "My Meetings",
-    href: "/my-meetings",
-    iconName: "Calendar",
-  },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
 ];
 
@@ -124,14 +90,8 @@ const EMPLOYEE_NAV: NavItem[] = [
   {
     key: "my-documents",
     label: "My Documents",
-    href: "/my-documents",
+    href: "/documents",
     iconName: "FileText",
-  },
-  {
-    key: "my-meetings",
-    label: "My Meetings",
-    href: "/my-meetings",
-    iconName: "Calendar",
   },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
 ];

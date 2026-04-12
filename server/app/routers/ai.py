@@ -25,8 +25,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.config import Settings, get_settings
 from app.core.security import validate_api_key
-from app.schemas.incident import EvaluateIncidentRequest, EvaluateIncidentResponse
+from app.prompts import (
+    build_evaluate_incident_prompt,
+    build_generate_agenda_prompt,
+    build_generate_document_prompt,
+    build_summarize_meeting_prompt,
+)
 from app.schemas.document import GenerateDocumentRequest, GenerateDocumentResponse
+from app.schemas.incident import EvaluateIncidentRequest, EvaluateIncidentResponse
 from app.schemas.meeting import (
     GenerateAgendaRequest,
     GenerateAgendaResponse,
@@ -41,12 +47,6 @@ from app.services.output_validator import (
     validate_evaluation_output,
 )
 from app.services.pii_sanitizer import sanitize_dict
-from app.prompts import (
-    build_evaluate_incident_prompt,
-    build_generate_document_prompt,
-    build_generate_agenda_prompt,
-    build_summarize_meeting_prompt,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -85,22 +85,70 @@ async def evaluate_incident(
     try:
         router_instance = AIRouter(settings)
 
+        try:
+            from app.services.supabase_client import get_supabase_client
+
+            supabase = get_supabase_client()
+        except Exception as e:
+            logger.warning(f"Failed to load supabase client: {e}")
+            supabase = None
+
         # Build prompt from structured data
+        previous_inc_count = 0
+        if supabase and body.employee_id:
+            try:
+                # Query db for actual historical incident count for this employee
+                inc_resp = (
+                    supabase.table("incidents")
+                    .select("id", count="exact")
+                    .eq("employee_id", body.employee_id)
+                    .execute()
+                )
+                previous_inc_count = inc_resp.count or 0
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch incident count for employee {body.employee_id}: {e}"
+                )
+
         incident_data = {
             "type": body.incident_text[:100],  # Simplified for MVP
             "severity": "medium",  # Default; would come from incident record
             "description": body.incident_text,
-            "previous_incident_count": 0,  # Would come from employee history
+            "previous_incident_count": previous_inc_count,
             "union_involved": False,
         }
 
         # Sanitize — no PII to AI providers
         sanitized = sanitize_dict(incident_data)
 
-        # For MVP: use a generic matched rule context
-        # In production, this comes from the policy_engine deterministic matching
+        # Vector DB Similarity Search (RAG)
+        query_embedding = None
+        try:
+            embeddings = await router_instance.get_embeddings([body.incident_text])
+            if embeddings and len(embeddings) > 0:
+                query_embedding = embeddings[0]
+        except Exception as e:
+            logger.warning(f"Failed to get embeddings: {e}")
+
+        rpc_result = None
+        if supabase and query_embedding:
+            try:
+                # Match against policy_embeddings
+                rpc_result = supabase.rpc(
+                    "match_policies",
+                    {
+                        "query_embedding": query_embedding,
+                        "match_threshold": 0.5,
+                        "match_count": 1,
+                        "company_id_filter": None,
+                    },
+                ).execute()
+            except Exception as e:
+                logger.warning(f"Failed to call match_policies RPC: {e}")
+
+        policy_content = ""
         matched_rule = {
-            "policy_title": "Company Disciplinary Policy",
+            "policy_title": "General Disciplinary Policy",
             "policy_category": "general",
             "rule_name": "Standard Violation",
             "escalation_level": 1,
@@ -113,9 +161,33 @@ async def evaluate_incident(
             ],
         }
 
+        if (
+            rpc_result
+            and hasattr(rpc_result, "data")
+            and rpc_result.data
+            and len(rpc_result.data) > 0
+        ):
+            best_match = rpc_result.data[0]
+            policy_content = best_match.get("content", "")
+            # Merge dynamically matched metadata if available
+            metadata = best_match.get("metadata", {})
+            if metadata.get("policy_title"):
+                matched_rule["policy_title"] = metadata["policy_title"]
+            if metadata.get("category"):
+                matched_rule["policy_category"] = metadata["category"]
+            if metadata.get("actions"):
+                matched_rule["actions"] = metadata["actions"]
+            if metadata.get("escalation_ladder"):
+                matched_rule["escalation_ladder"] = metadata["escalation_ladder"]
+            if metadata.get("escalation_level"):
+                matched_rule["escalation_level"] = metadata["escalation_level"]
+            if metadata.get("rule_name"):
+                matched_rule["rule_name"] = metadata["rule_name"]
+
         messages = build_evaluate_incident_prompt(
             incident=sanitized,
             matched_rule=matched_rule,
+            policy_content=policy_content,
         )
 
         # Call AI
@@ -187,36 +259,133 @@ async def generate_document(
     try:
         router_instance = AIRouter(settings)
 
+        try:
+            from app.services.supabase_client import get_supabase_client
+
+            supabase = get_supabase_client()
+        except Exception as e:
+            logger.warning(f"Failed to load supabase client: {e}")
+            supabase = None
+
+        incident_id = body.template_variables.get("incident_id")
+
+        # Load incident from DB if incident_id is passed, else use fallbacks
+        db_incident = None
+        previous_inc_count = 0
+
+        if supabase and incident_id:
+            try:
+                resp = (
+                    supabase.table("incidents")
+                    .select("*")
+                    .eq("id", incident_id)
+                    .maybe_single()
+                    .execute()
+                )
+                if resp and hasattr(resp, "data") and resp.data:
+                    db_incident = resp.data
+
+                    # Fetch historical incidents count for this user
+                    emp_id = db_incident.get("employee_id")
+                    if emp_id:
+                        inc_resp = (
+                            supabase.table("incidents")
+                            .select("id", count="exact")
+                            .eq("employee_id", emp_id)
+                            .execute()
+                        )
+                        previous_inc_count = inc_resp.count or 0
+            except Exception as e:
+                logger.warning(f"Failed to fetch incident {incident_id}: {e}")
+
+        # Map mapped fields dynamically or fallback to template variables
         incident_data = {
-            "reference_number": "INC-2026-0001",
-            "incident_date": "2026-03-15",
-            "type": "tardiness",
-            "severity": "medium",
-            "description": body.context or "Incident description",
-            "previous_incident_count": 0,
-            "union_involved": False,
+            "reference_number": (
+                db_incident.get("reference_number")
+                if db_incident
+                else body.template_variables.get("reference_number", "INC-XXXX")
+            ),
+            "incident_date": (
+                db_incident.get("incident_date")
+                if db_incident
+                else body.template_variables.get(
+                    "incident_date", time.strftime("%Y-%m-%d")
+                )
+            ),
+            "type": (
+                db_incident.get("type", "unknown")
+                if db_incident
+                else body.template_variables.get("type", "unknown")
+            ),
+            "severity": (
+                db_incident.get("severity", "medium")
+                if db_incident
+                else body.template_variables.get("severity", "medium")
+            ),
+            "description": (
+                db_incident.get("description")
+                if db_incident
+                else body.template_variables.get(
+                    "description",
+                    body.additional_instructions or "Incident description",
+                )
+            ),
+            "previous_incident_count": previous_inc_count,
+            "union_involved": (
+                db_incident.get("union_involved", False)
+                if db_incident
+                else body.template_variables.get("union_involved", False)
+            ),
         }
 
         sanitized = sanitize_dict(incident_data)
 
+        # Pull matched rule context from db_incident if possible
         matched_rule = {
             "policy_title": "Company Disciplinary Policy",
             "policy_category": "general",
             "rule_name": "Standard Violation",
-            "escalation_level": 1,
+            "escalation_level": (
+                db_incident.get("escalation_level", 1) if db_incident else 1
+            ),
             "actions": [
                 {
-                    "type": body.action_type or "verbal_warning",
+                    "type": body.template_variables.get("action_type")
+                    or "verbal_warning",
                     "description": "Required corrective action",
                     "deadline_days": 30,
                 }
             ],
         }
 
+        policy_content = ""
+        # Could fetch policy via linked_policy_id from DB
+        if supabase and db_incident and db_incident.get("linked_policy_id"):
+            try:
+                pol_resp = (
+                    supabase.table("policies")
+                    .select("content, title, category")
+                    .eq("id", db_incident["linked_policy_id"])
+                    .maybe_single()
+                    .execute()
+                )
+                if pol_resp and hasattr(pol_resp, "data") and pol_resp.data:
+                    matched_rule["policy_title"] = pol_resp.data.get(
+                        "title", matched_rule["policy_title"]
+                    )
+                    matched_rule["policy_category"] = pol_resp.data.get(
+                        "category", matched_rule["policy_category"]
+                    )
+                    policy_content = pol_resp.data.get("content", "")
+            except Exception as e:
+                logger.warning(f"Failed to fetch policy: {e}")
+
         messages = build_generate_document_prompt(
             incident=sanitized,
-            action_type=body.action_type or "verbal_warning",
+            action_type=body.template_variables.get("action_type")
+            or body.document_type.value,
             matched_rule=matched_rule,
+            policy_content=policy_content,
         )
 
         result = await router_instance.call(

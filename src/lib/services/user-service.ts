@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export interface UserResponse {
   id: string;
   company_id: string;
+  company_name?: string | null;
   department_id: string | null;
   role: string;
   first_name: string;
@@ -84,7 +85,7 @@ export async function getUser(
 
   const { data, error } = await supabase
     .from("users")
-    .select("*")
+    .select("*, companies(name)")
     .eq("id", userId)
     .eq("company_id", companyId)
     .single();
@@ -235,10 +236,47 @@ export async function updateUser(
   return mapToResponse(data);
 }
 
+export async function updateOwnUser(
+  companyId: string,
+  userId: string,
+  updates: Partial<{
+    first_name: string;
+    last_name: string;
+    job_title: string | null;
+    phone: string | null;
+    avatar_url: string | null;
+  }>,
+): Promise<UserResponse> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("users")
+    .update(updates)
+    .eq("id", userId)
+    .eq("company_id", companyId)
+    .select("*, companies(name)")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update profile: ${error.message}`);
+  }
+
+  return mapToResponse(data);
+}
+
 function mapToResponse(data: Record<string, unknown>): UserResponse {
+  const companies = data.companies as
+    | { name?: string | null }
+    | { name?: string | null }[]
+    | null;
+  const companyName = Array.isArray(companies)
+    ? (companies[0]?.name ?? null)
+    : (companies?.name ?? null);
+
   return {
     id: data.id as string,
     company_id: data.company_id as string,
+    company_name: companyName,
     department_id: (data.department_id as string) ?? null,
     role: data.role as string,
     first_name: (data.first_name as string) ?? "",

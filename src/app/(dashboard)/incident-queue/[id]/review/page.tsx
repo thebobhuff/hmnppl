@@ -8,28 +8,29 @@
  */
 "use client";
 
-import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Textarea } from "@/components/ui/textarea";
+import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
+import { incidentsAPI } from "@/lib/api/client";
 import {
-  CheckCircle,
-  XCircle,
-  Edit3,
-  FileText,
-  User,
-  Calendar,
   AlertTriangle,
   Brain,
+  Calendar,
+  CheckCircle,
   ChevronRight,
   Clock,
+  Edit3,
+  FileText,
   TrendingUp,
+  User,
+  XCircle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Mock Data
@@ -60,10 +61,10 @@ const MOCK_INCIDENT = {
 
 const MOCK_DOCUMENT = `# Written Warning — Attendance Policy Violation
 
-**Employee:** John Smith  
-**Position:** Software Engineer  
-**Department:** Engineering  
-**Date:** March 15, 2026  
+**Employee:** John Smith
+**Position:** Software Engineer
+**Department:** Engineering
+**Date:** March 15, 2026
 **Reference:** INC-2026-0042
 
 ---
@@ -95,7 +96,7 @@ Failure to comply with the above requirements may result in further disciplinary
 
 **Employee Acknowledgment:** I acknowledge receipt of this written warning.
 
-**HR Representative:** Maria Garcia  
+**HR Representative:** Maria Garcia
 **Date:** ___________`;
 
 const MOCK_TIMELINE = [
@@ -135,6 +136,7 @@ export default function DocumentReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = params as unknown as { id: string };
+  const router = useRouter();
   const [reviewMode, setReviewMode] = useState<"view" | "edit">("view");
   const [documentContent, setDocumentContent] = useState(MOCK_DOCUMENT);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -154,15 +156,28 @@ export default function DocumentReviewPage({
     setApproveModalOpen(true);
   };
 
-  const handleApproveConfirm = () => {
-    // TODO: Call API to approve
-    setApproveModalOpen(false);
+  const handleApproveConfirm = async () => {
+    try {
+      await incidentsAPI.updateStatus(resolvedParams.id, { status: "approved" });
+      setApproveModalOpen(false);
+      router.push("/incident-queue");
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (rejectReason.length < 20) return;
-    // TODO: Call API to reject
-    setRejectModalOpen(false);
+    try {
+      await incidentsAPI.updateStatus(resolvedParams.id, {
+        status: "rejected",
+        reason: rejectReason,
+      });
+      setRejectModalOpen(false);
+      router.push("/incident-queue");
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (

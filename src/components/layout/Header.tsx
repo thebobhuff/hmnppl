@@ -7,8 +7,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Menu, ChevronDown, LogOut, UserCircle } from "lucide-react";
+import { Menu, ChevronDown, LogOut, UserCircle, Bug } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/stores/sidebar-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -16,8 +17,10 @@ import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { NotificationBell } from "@/components/domain/NotificationBell";
+import { Button } from "@/components/ui/button";
 
 export function Header() {
+  const router = useRouter();
   const breakpoint = useBreakpoint();
   const { toggleMobileOpen, collapsed } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
@@ -25,6 +28,7 @@ export function Header() {
   const { breadcrumbs } = useBreadcrumbs();
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const isMobile = breakpoint === "mobile";
@@ -60,6 +64,23 @@ export function Header() {
     return () => document.removeEventListener("keydown", handleEscape);
   }, []);
 
+  async function handleSignOut() {
+    setProfileOpen(false);
+    setIsSigningOut(true);
+
+    try {
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      logout();
+      router.push("/login");
+      router.refresh();
+      setIsSigningOut(false);
+    }
+  }
+
   return (
     <header
       className={cn(
@@ -92,6 +113,25 @@ export function Header() {
 
       {/* Right side actions */}
       <div className="flex flex-shrink-0 items-center gap-2">
+        <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+          <Link href="/feedback">
+            <Bug className="mr-2 h-4 w-4" />
+            Report Bug / Request Feature
+          </Link>
+        </Button>
+
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
+          aria-label="Report bug or request feature"
+        >
+          <Link href="/feedback">
+            <Bug className="h-4 w-4" />
+          </Link>
+        </Button>
+
         {/* Notification Bell */}
         <NotificationBell />
 
@@ -176,19 +216,17 @@ export function Header() {
                 </Link>
 
                 <button
-                  onClick={() => {
-                    setProfileOpen(false);
-                    logout();
-                  }}
+                  onClick={handleSignOut}
                   className={cn(
                     "flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brand-error transition-colors",
                     "hover:bg-brand-error-dim/10",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary",
                   )}
                   role="menuitem"
+                  disabled={isSigningOut}
                 >
                   <LogOut className="h-4 w-4" />
-                  <span>Sign Out</span>
+                  <span>{isSigningOut ? "Signing Out..." : "Sign Out"}</span>
                 </button>
               </div>
             </div>

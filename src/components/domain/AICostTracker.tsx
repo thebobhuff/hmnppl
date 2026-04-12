@@ -56,11 +56,18 @@ const MOCK_METRICS: CostMetrics = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function AICostTracker() {
+export function AICostTracker({ monthlyBudget }: { monthlyBudget?: number }) {
   const [metrics, setMetrics] = useState<CostMetrics>(MOCK_METRICS);
 
+  const effectiveMetrics = {
+    ...metrics,
+    monthlyBudget: monthlyBudget ?? metrics.monthlyBudget,
+  };
+
   const budgetUsed =
-    metrics.monthlyBudget > 0 ? (metrics.monthlyCost / metrics.monthlyBudget) * 100 : 0;
+    effectiveMetrics.monthlyBudget > 0
+      ? (effectiveMetrics.monthlyCost / effectiveMetrics.monthlyBudget) * 100
+      : 0;
 
   const alerts: CostAlert[] = [
     { threshold: 50, triggered: budgetUsed >= 50, message: "AI budget 50% used" },
@@ -102,7 +109,7 @@ export function AICostTracker() {
                   : "text-brand-success"
             }`}
           >
-            ${metrics.monthlyCost.toFixed(2)} / ${metrics.monthlyBudget.toFixed(2)}
+            ${effectiveMetrics.monthlyCost.toFixed(2)} / ${effectiveMetrics.monthlyBudget.toFixed(2)}
           </span>
         </div>
         <div className="h-3 w-full overflow-hidden rounded-full bg-brand-slate-light">
@@ -119,7 +126,7 @@ export function AICostTracker() {
         </div>
         <p className="mt-1 text-xs text-text-tertiary">
           {budgetUsed.toFixed(1)}% used · $
-          {Math.max(0, metrics.monthlyBudget - metrics.monthlyCost).toFixed(2)} remaining
+          {Math.max(0, effectiveMetrics.monthlyBudget - effectiveMetrics.monthlyCost).toFixed(2)} remaining
         </p>
       </div>
 
@@ -128,22 +135,22 @@ export function AICostTracker() {
         <StatItem
           icon={<BarChart3 className="h-3.5 w-3.5" />}
           label="Daily Tokens"
-          value={metrics.dailyTokens.toLocaleString()}
+          value={effectiveMetrics.dailyTokens.toLocaleString()}
         />
         <StatItem
           icon={<TrendingUp className="h-3.5 w-3.5" />}
           label="Requests Today"
-          value={metrics.requestCount.toString()}
+          value={effectiveMetrics.requestCount.toString()}
         />
         <StatItem
           icon={<DollarSign className="h-3.5 w-3.5" />}
           label="Daily Cost"
-          value={`$${metrics.dailyCost.toFixed(2)}`}
+          value={`$${effectiveMetrics.dailyCost.toFixed(2)}`}
         />
         <StatItem
           icon={<DollarSign className="h-3.5 w-3.5" />}
           label="Avg/Request"
-          value={`$${metrics.averageCostPerRequest.toFixed(3)}`}
+          value={`$${effectiveMetrics.averageCostPerRequest.toFixed(3)}`}
         />
       </div>
 
