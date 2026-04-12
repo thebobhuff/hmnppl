@@ -1,21 +1,27 @@
+"use client";
+
 /**
  * AI Document Review — Three-Panel Layout for HR Agents.
  *
  * LEFT: AI-generated document (editable, track changes)
  * CENTER: Employee history timeline + profile
  * RIGHT: AI reasoning (confidence breakdown, matched rule, alternatives)
- * Bottom: Sticky action bar (Approve / Approve with Edits / Reject)
+ * Bottom: Sticky action bar (Approve / Reject)
+ *
+ * Now uses REAL AI data from the pipeline.
  */
-"use client";
 
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
-import { incidentsAPI } from "@/lib/api/client";
+import { incidentsAPI, type APIError } from "@/lib/api/client";
 import {
   AlertTriangle,
   Brain,
@@ -25,151 +31,151 @@ import {
   Clock,
   Edit3,
   FileText,
+  Loader2,
   TrendingUp,
   User,
   XCircle,
+  ShieldAlert,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 // ---------------------------------------------------------------------------
-// Mock Data
+// Types for real AI evaluation data
 // ---------------------------------------------------------------------------
 
-const MOCK_INCIDENT = {
-  id: "1",
-  reference: "INC-2026-0042",
+interface EvaluationData {
+  incident: {
+    id: string;
+    reference_number: string;
+    type: string;
+    severity: string;
+    description: string;
+    incident_date: string;
+    status: string;
+    ai_confidence_score: number | null;
+    ai_evaluation_status: string | null;
+    escalation_level: number | null;
+    previous_incident_count: number;
+    union_involved: boolean;
+    created_at: string;
+  };
   employee: {
-    name: "John Smith",
-    email: "john@acme.com",
-    title: "Software Engineer",
-    department: "Engineering",
-    hireDate: "2023-06-15",
-  },
-  type: "Tardiness",
-  severity: "medium",
-  description:
-    "Employee arrived 45 minutes late without prior notice. Third occurrence this month.",
-  incidentDate: "2026-03-15",
-  reportedBy: "David Park",
-  aiConfidence: 0.92,
-  matchedPolicy: "Attendance & Punctuality Policy",
-  matchedRule: "Repeated Tardiness — Level 2",
-  escalationLevel: 2,
-  previousIncidents: 2,
-};
-
-const MOCK_DOCUMENT = `# Written Warning — Attendance Policy Violation
-
-**Employee:** John Smith
-**Position:** Software Engineer
-**Department:** Engineering
-**Date:** March 15, 2026
-**Reference:** INC-2026-0042
-
----
-
-## Incident Summary
-
-On March 15, 2026, the above-named employee arrived 45 minutes late to work without providing prior notice to their supervisor. This marks the third documented occurrence of tardiness within the current calendar month.
-
-## Policy Violation
-
-This incident constitutes a violation of the **Attendance & Punctuality Policy**, Section 3.2: "Repeated Tardiness." The policy states that three or more unexcused late arrivals within a 30-day period warrant a written warning.
-
-## Previous Incidents
-
-1. **INC-2026-0028** (Feb 12, 2026) — 20 minutes late, verbal warning issued
-2. **INC-2026-0035** (Mar 1, 2026) — 30 minutes late, verbal warning issued
-
-## Required Actions
-
-1. Employee must arrive on time for all scheduled shifts for the next 60 days
-2. Employee must notify supervisor at least 1 hour before scheduled start time if unable to arrive on time
-3. Employee must attend the scheduled meeting with HR representative
-
-## Consequences of Non-Compliance
-
-Failure to comply with the above requirements may result in further disciplinary action, up to and including a Performance Improvement Plan (PIP) or termination of employment.
-
----
-
-**Employee Acknowledgment:** I acknowledge receipt of this written warning.
-
-**HR Representative:** Maria Garcia
-**Date:** ___________`;
-
-const MOCK_TIMELINE = [
-  {
-    id: "1",
-    date: "2026-03-15",
-    type: "incident",
-    title: "Tardiness — 45 min late",
-    severity: "medium" as const,
-    status: "pending_hr_review",
-  },
-  {
-    id: "2",
-    date: "2026-03-01",
-    type: "incident",
-    title: "Tardiness — 30 min late",
-    severity: "low" as const,
-    status: "approved",
-  },
-  {
-    id: "3",
-    date: "2026-02-12",
-    type: "incident",
-    title: "Tardiness — 20 min late",
-    severity: "low" as const,
-    status: "approved",
-  },
-];
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    job_title: string | null;
+    hire_date: string | null;
+    department_id: string | null;
+  } | null;
+  reporter: { id: string; first_name: string; last_name: string; email: string } | null;
+  previousIncidents: Array<{
+    id: string;
+    type: string;
+    severity: string;
+    created_at: string;
+    status: string;
+    description: string;
+  }>;
+  disciplinaryAction: {
+    id: string;
+    action_type: string;
+    status: string;
+  } | null;
+  generatedDocument: string | null;
+  aiRecommendation: Record<string, unknown> | null;
+  matchedPolicy: Record<string, unknown> | null;
+  riskFactors: string[];
+  coachingTopics: string[];
+  trainingGaps: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function DocumentReviewPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = params as unknown as { id: string };
+export default function DocumentReviewPage() {
+  const params = useParams();
   const router = useRouter();
+  const incidentId = params.id as string;
+
+  const [data, setData] = useState<EvaluationData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [reviewMode, setReviewMode] = useState<"view" | "edit">("view");
-  const [documentContent, setDocumentContent] = useState(MOCK_DOCUMENT);
+  const [documentContent, setDocumentContent] = useState("");
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [rejectNextStep, setRejectNextStep] = useState<
-    "regenerate" | "escalate_legal" | "close"
-  >("regenerate");
+  const [rejectNextStep, setRejectNextStep] = useState<"regenerate" | "escalate_legal" | "close">("regenerate");
   const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const breadcrumbs = usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
     { label: "Incident Queue", href: "/incident-queue" },
-    { label: `Review ${MOCK_INCIDENT.reference}` },
+    { label: data ? `Review ${data.incident.reference_number}` : "Reviewing..."},
   ]);
 
-  const handleApprove = () => {
-    setApproveModalOpen(true);
-  };
+  // Fetch real evaluation data
+  useEffect(() => {
+    let active = true;
+    async function fetch() {
+      try {
+        const res = await fetch(`/api/v1/incidents/${incidentId}/evaluation`);
+        if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
+        const json = await res.json();
+        if (active) {
+          setData(json);
+          if (json.generatedDocument) {
+            setDocumentContent(json.generatedDocument);
+          }
+        }
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Failed to load evaluation");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    fetch();
+    return () => { active = false; };
+  }, [incidentId]);
+
+  // Auto-refresh if AI is still evaluating
+  useEffect(() => {
+    if (!data || data.incident.status !== "ai_evaluating") return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/incidents/${incidentId}/evaluation`);
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+          if (json.generatedDocument) setDocumentContent(json.generatedDocument);
+          if (json.incident.status !== "ai_evaluating") clearInterval(interval);
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [data?.incident.status, incidentId]);
 
   const handleApproveConfirm = async () => {
+    setSubmitting(true);
     try {
-      await incidentsAPI.updateStatus(resolvedParams.id, { status: "approved" });
+      await incidentsAPI.updateStatus(incidentId, { status: "approved" });
       setApproveModalOpen(false);
       router.push("/incident-queue");
     } catch (e) {
       console.error(e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleReject = async () => {
     if (rejectReason.length < 20) return;
+    setSubmitting(true);
     try {
-      await incidentsAPI.updateStatus(resolvedParams.id, {
+      await incidentsAPI.updateStatus(incidentId, {
         status: "rejected",
         reason: rejectReason,
       });
@@ -177,16 +183,72 @@ export default function DocumentReviewPage({
       router.push("/incident-queue");
     } catch (e) {
       console.error(e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // ── Loading state ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <PageContainer title="Loading Review...">
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-text-tertiary" />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  // ── Error state ────────────────────────────────────────────────────────
+  if (error || !data) {
+    return (
+      <PageContainer title="Error">
+        <Card className="mx-auto max-w-lg p-8 text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-brand-error" />
+          <h2 className="mt-4 text-lg font-semibold text-text-primary">Failed to Load</h2>
+          <p className="mt-2 text-sm text-text-secondary">{error ?? "Unknown error"}</p>
+          <Button className="mt-4" variant="outline" onClick={() => router.push("/incident-queue")}>
+            Back to Queue
+          </Button>
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  // ── Still evaluating ───────────────────────────────────────────────────
+  if (data.incident.status === "ai_evaluating") {
+    return (
+      <PageContainer
+        title={`Evaluating: ${data.incident.reference_number}`}
+        description="AI is analyzing this incident..."
+      >
+        <Card className="mx-auto max-w-lg p-8 text-center">
+          <Brain className="mx-auto h-12 w-12 animate-pulse text-brand-primary" />
+          <h2 className="mt-4 text-lg font-semibold text-text-primary">AI Evaluation In Progress</h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            The AI pipeline is running risk classification, policy matching, escalation routing, and document generation.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-text-tertiary">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            Auto-refreshing every 5 seconds...
+          </div>
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  const { incident, employee, previousIncidents } = data;
+  const confidence = incident.ai_confidence_score ?? 0;
+  const recommendation = data.aiRecommendation ?? {};
+  const escalationLevel = incident.escalation_level ?? 1;
+
   return (
     <PageContainer
-      title={`Review: ${MOCK_INCIDENT.reference}`}
-      description={`${MOCK_INCIDENT.employee.name} — ${MOCK_INCIDENT.type}`}
+      title={`Review: ${incident.reference_number}`}
+      description={`${employee ? `${employee.first_name} ${employee.last_name}` : "Unknown"} \u2014 ${incident.type}`}
     >
       {/* Confidence Banner */}
-      <div className="bg-brand-slate-dark mb-4 flex items-center gap-4 rounded-lg border border-border p-4">
+      <div className="mb-4 flex items-center gap-4 rounded-lg border border-border bg-brand-slate-dark p-4">
         <div className="flex items-center gap-2">
           <Brain className="h-5 w-5 text-brand-primary" />
           <span className="text-sm font-medium text-text-primary">AI Confidence</span>
@@ -194,15 +256,20 @@ export default function DocumentReviewPage({
         <div className="flex-1">
           <div className="h-2 w-full overflow-hidden rounded-full bg-brand-slate-light">
             <div
-              className="h-full rounded-full bg-brand-success transition-all"
-              style={{ width: `${MOCK_INCIDENT.aiConfidence * 100}%` }}
+              className={`h-full rounded-full transition-all ${
+                confidence >= 0.85 ? "bg-brand-success" : confidence >= 0.7 ? "bg-brand-warning" : "bg-brand-error"
+              }`}
+              style={{ width: `${confidence * 100}%` }}
             />
           </div>
         </div>
-        <span className="text-lg font-bold text-brand-success">
-          {Math.round(MOCK_INCIDENT.aiConfidence * 100)}%
+        <span className={`text-lg font-bold ${
+          confidence >= 0.85 ? "text-brand-success" : confidence >= 0.7 ? "text-brand-warning" : "text-brand-error"
+        }`}>
+          {Math.round(confidence * 100)}%
         </span>
-        <Badge variant="warning">Level {MOCK_INCIDENT.escalationLevel}</Badge>
+        <Badge variant="outline">Level {escalationLevel}</Badge>
+        {incident.union_involved && <Badge variant="warning">Union</Badge>}
       </div>
 
       {/* Three-Panel Layout */}
@@ -223,19 +290,28 @@ export default function DocumentReviewPage({
               {reviewMode === "view" ? "Edit" : "Done Editing"}
             </Button>
           </div>
-          <div className="bg-brand-slate-dark max-h-[600px] overflow-y-auto rounded-lg border border-border p-4">
-            {reviewMode === "edit" ? (
-              <Textarea
-                value={documentContent}
-                onChange={(e) => setDocumentContent(e.target.value)}
-                className="min-h-[500px] font-mono text-sm"
-              />
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm text-text-secondary">
-                {documentContent}
-              </pre>
-            )}
-          </div>
+          {documentContent ? (
+            <div className="max-h-[600px] overflow-y-auto rounded-lg border border-border bg-brand-slate-dark p-4">
+              {reviewMode === "edit" ? (
+                <Textarea
+                  value={documentContent}
+                  onChange={(e) => setDocumentContent(e.target.value)}
+                  className="min-h-[500px] font-mono text-sm"
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap text-sm text-text-secondary">
+                  {documentContent}
+                </pre>
+              )}
+            </div>
+          ) : (
+            <div className="flex h-48 items-center justify-center rounded-lg border border-border">
+              <div className="text-center">
+                <Sparkles className="mx-auto h-8 w-8 text-text-tertiary" />
+                <p className="mt-2 text-sm text-text-tertiary">No document generated yet</p>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* CENTER: Employee Timeline */}
@@ -246,47 +322,55 @@ export default function DocumentReviewPage({
           </h3>
 
           {/* Profile */}
-          <div className="mb-4 rounded-lg border border-border p-3">
-            <p className="text-sm font-medium text-text-primary">
-              {MOCK_INCIDENT.employee.name}
-            </p>
-            <p className="text-xs text-text-tertiary">{MOCK_INCIDENT.employee.title}</p>
-            <p className="text-xs text-text-tertiary">
-              {MOCK_INCIDENT.employee.department}
-            </p>
-            <div className="mt-2 flex items-center gap-1 text-xs text-text-tertiary">
-              <Calendar className="h-3 w-3" />
-              Hired: {MOCK_INCIDENT.employee.hireDate}
+          {employee && (
+            <div className="mb-4 rounded-lg border border-border p-3">
+              <p className="text-sm font-medium text-text-primary">
+                {employee.first_name} {employee.last_name}
+              </p>
+              <p className="text-xs text-text-tertiary">{employee.job_title ?? "No title"}</p>
+              {employee.hire_date && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-text-tertiary">
+                  <Calendar className="h-3 w-3" /> Hired: {new Date(employee.hire_date).toLocaleDateString()}
+                </div>
+              )}
+              <div className="mt-1 flex items-center gap-1 text-xs text-text-tertiary">
+                <TrendingUp className="h-3 w-3" />
+                {incident.previous_incident_count} prior incident{incident.previous_incident_count !== 1 ? "s" : ""}
+              </div>
             </div>
-            <div className="mt-1 flex items-center gap-1 text-xs text-text-tertiary">
-              <TrendingUp className="h-3 w-3" />
-              {MOCK_INCIDENT.previousIncidents} prior incidents
-            </div>
-          </div>
+          )}
 
           {/* Timeline */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-text-tertiary">Incident History</p>
-            {MOCK_TIMELINE.map((item, i) => (
-              <div
-                key={item.id}
-                className={`relative rounded-lg border border-border p-2.5 ${
-                  i === 0 ? "border-l-2 border-l-brand-primary bg-brand-primary/5" : ""
-                }`}
-              >
+            {/* Current incident */}
+            <div className="rounded-lg border-l-2 border-l-brand-primary bg-brand-primary/5 p-2.5">
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 flex-shrink-0 text-text-tertiary" />
+                <span className="text-xs text-text-tertiary">{new Date(incident.created_at).toLocaleDateString()}</span>
+              </div>
+              <p className="mt-1 text-xs font-medium text-text-primary">{incident.type} \u2014 {incident.severity}</p>
+              <Badge variant="warning" className="mt-1 text-[10px]">Current</Badge>
+            </div>
+            {/* Previous */}
+            {previousIncidents.map((prev) => (
+              <div key={prev.id} className="rounded-lg border border-border p-2.5">
                 <div className="flex items-center gap-2">
                   <Clock className="h-3.5 w-3.5 flex-shrink-0 text-text-tertiary" />
-                  <span className="text-xs text-text-tertiary">{item.date}</span>
+                  <span className="text-xs text-text-tertiary">{new Date(prev.created_at).toLocaleDateString()}</span>
                 </div>
-                <p className="mt-1 text-xs font-medium text-text-primary">{item.title}</p>
+                <p className="mt-1 text-xs font-medium text-text-primary">{prev.type} \u2014 {prev.severity}</p>
                 <Badge
-                  variant={item.status === "approved" ? "success" : "warning"}
+                  variant={["approved", "resolved", "closed"].includes(prev.status) ? "success" : "outline"}
                   className="mt-1 text-[10px]"
                 >
-                  {item.status.replace(/_/g, " ")}
+                  {prev.status.replace(/_/g, " ")}
                 </Badge>
               </div>
             ))}
+            {previousIncidents.length === 0 && (
+              <p className="text-xs text-text-tertiary">No prior incidents.</p>
+            )}
           </div>
         </Card>
 
@@ -298,26 +382,15 @@ export default function DocumentReviewPage({
           </h3>
 
           <div className="space-y-4">
-            {/* Matched Rule */}
+            {/* Matched Policy */}
             <div className="rounded-lg border border-border p-3">
               <p className="text-xs font-medium text-text-tertiary">Matched Policy</p>
               <p className="mt-1 text-sm font-medium text-text-primary">
-                {MOCK_INCIDENT.matchedPolicy}
+                {(recommendation.matched_policy as string) ?? "No policy matched"}
               </p>
-              <p className="text-xs text-text-secondary">{MOCK_INCIDENT.matchedRule}</p>
-            </div>
-
-            {/* Confidence Breakdown */}
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-xs font-medium text-text-tertiary">
-                Confidence Breakdown
-              </p>
-              <div className="mt-2 space-y-2">
-                <ConfidenceBar label="Policy Match" value={0.96} />
-                <ConfidenceBar label="Severity Assessment" value={0.88} />
-                <ConfidenceBar label="Escalation Level" value={0.95} />
-                <ConfidenceBar label="Document Quality" value={0.9} />
-              </div>
+              {(recommendation.matched_rule as string) && (
+                <p className="text-xs text-text-secondary">{recommendation.matched_rule as string}</p>
+              )}
             </div>
 
             {/* Escalation Ladder */}
@@ -325,28 +398,22 @@ export default function DocumentReviewPage({
               <p className="text-xs font-medium text-text-tertiary">Escalation Ladder</p>
               <div className="mt-2 space-y-1.5">
                 {[
-                  { level: 1, action: "Verbal Warning", status: "completed" as const },
-                  { level: 2, action: "Written Warning", status: "current" as const },
-                  { level: 3, action: "PIP", status: "pending" as const },
-                  { level: 4, action: "Termination Review", status: "pending" as const },
+                  { level: 1, action: "Verbal Warning" },
+                  { level: 2, action: "Written Warning" },
+                  { level: 3, action: "PIP" },
+                  { level: 4, action: "Termination Review" },
                 ].map((step) => (
                   <div key={step.level} className="flex items-center gap-2">
                     <ChevronRight
                       className={`h-3 w-3 ${
-                        step.status === "completed"
-                          ? "text-brand-success"
-                          : step.status === "current"
-                            ? "text-brand-primary"
-                            : "text-text-tertiary"
+                        step.level < escalationLevel ? "text-brand-success" :
+                        step.level === escalationLevel ? "text-brand-primary" : "text-text-tertiary"
                       }`}
                     />
                     <span
                       className={`text-xs ${
-                        step.status === "completed"
-                          ? "text-brand-success"
-                          : step.status === "current"
-                            ? "font-medium text-brand-primary"
-                            : "text-text-tertiary"
+                        step.level < escalationLevel ? "text-brand-success" :
+                        step.level === escalationLevel ? "font-medium text-brand-primary" : "text-text-tertiary"
                       }`}
                     >
                       Level {step.level}: {step.action}
@@ -357,36 +424,72 @@ export default function DocumentReviewPage({
             </div>
 
             {/* Risk Factors */}
-            <div className="rounded-lg border border-brand-error/30 bg-brand-error/5 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-medium text-brand-error">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Risk Factors
-              </p>
-              <ul className="mt-2 space-y-1 text-xs text-text-secondary">
-                <li>• Third occurrence in 30 days</li>
-                <li>• Pattern of increasing lateness</li>
-              </ul>
-            </div>
+            {data.riskFactors.length > 0 && (
+              <div className="rounded-lg border border-brand-error/30 bg-brand-error/5 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-brand-error">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Risk Factors
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-text-secondary">
+                  {data.riskFactors.map((factor, i) => (
+                    <li key={i}>\u2022 {factor}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Coaching Topics */}
+            {data.coachingTopics.length > 0 && (
+              <div className="rounded-lg border border-brand-primary/30 bg-brand-primary/5 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-brand-primary">
+                  <Sparkles className="h-3.5 w-3.5" /> Manager Coaching Needed
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-text-secondary">
+                  {data.coachingTopics.map((topic, i) => (
+                    <li key={i}>\u2022 {topic}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Training Gaps */}
+            {data.trainingGaps.length > 0 && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                  <TrendingUp className="h-3.5 w-3.5" /> Training Gaps Detected
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-text-secondary">
+                  {data.trainingGaps.map((gap, i) => (
+                    <li key={i}>\u2022 {gap}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* AI Reasoning */}
+            {recommendation.reasoning && (
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs font-medium text-text-tertiary">AI Reasoning</p>
+                <p className="mt-1 text-xs text-text-secondary">{recommendation.reasoning as string}</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>
 
       {/* Sticky Action Bar */}
-      <div className="bg-brand-slate-dark/95 fixed bottom-0 left-0 right-0 border-t border-border backdrop-blur-sm lg:left-64">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-brand-slate-dark/95 backdrop-blur-sm lg:left-64">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="text-xs text-text-tertiary">
             {reviewMode === "edit"
-              ? "Editing mode — changes will be logged in audit trail"
-              : "Reviewing document"}
+              ? "Editing mode \u2014 changes will be logged in audit trail"
+              : "Reviewing AI-generated document"}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setRejectModalOpen(true)}>
-              <XCircle className="mr-1.5 h-4 w-4" />
-              Reject
+              <XCircle className="mr-1.5 h-4 w-4" /> Reject
             </Button>
-            <Button variant="default" onClick={handleApprove}>
-              <CheckCircle className="mr-1.5 h-4 w-4" />
-              Approve
+            <Button onClick={() => setApproveModalOpen(true)}>
+              <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
             </Button>
           </div>
         </div>
@@ -394,183 +497,64 @@ export default function DocumentReviewPage({
 
       {/* Reject Modal */}
       <Modal open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
           <h3 className="text-lg font-semibold text-text-primary">Reject Document</h3>
-          <p className="text-sm text-text-secondary">
-            Provide a reason for rejection and choose the next step.
+          <p className="text-sm text-text-secondary">Provide a reason and choose the next step.</p>
+          <Textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Explain why this document is being rejected..."
+            className="min-h-[80px]"
+            maxLength={1000}
+          />
+          <p className={`text-xs ${rejectReason.length < 20 && rejectReason.length > 0 ? "text-brand-error" : "text-text-tertiary"}`}>
+            {rejectReason.length}/1000 (min 20)
           </p>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary">
-                Reason <span className="text-brand-error">*</span>
+          <div className="space-y-2">
+            {([
+              { value: "regenerate" as const, label: "Regenerate with Feedback", desc: "AI will regenerate with your feedback" },
+              { value: "escalate_legal" as const, label: "Escalate to Legal", desc: "Flag for legal review" },
+              { value: "close" as const, label: "Close Without Action", desc: "Close the incident" },
+            ]).map((opt) => (
+              <label key={opt.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${
+                rejectNextStep === opt.value ? "border-brand-primary bg-brand-primary/5" : "border-border hover:bg-card-hover"
+              }`}>
+                <input type="radio" checked={rejectNextStep === opt.value} onChange={() => setRejectNextStep(opt.value)} className="mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">{opt.label}</p>
+                  <p className="text-xs text-text-tertiary">{opt.desc}</p>
+                </div>
               </label>
-              <Textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Explain why this document is being rejected..."
-                className="mt-2 min-h-[80px]"
-                maxLength={1000}
-              />
-              <p
-                className={`mt-1 text-xs ${rejectReason.length < 20 && rejectReason.length > 0 ? "text-brand-error" : "text-text-tertiary"}`}
-              >
-                {rejectReason.length}/1000 (minimum 20 characters)
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary">
-                Next Step
-              </label>
-              <div className="mt-2 space-y-2">
-                {[
-                  {
-                    value: "regenerate" as const,
-                    label: "Regenerate with Feedback",
-                    desc: "AI will regenerate the document with your feedback",
-                  },
-                  {
-                    value: "escalate_legal" as const,
-                    label: "Escalate to Legal",
-                    desc: "Flag for legal review (Legal Hold)",
-                  },
-                  {
-                    value: "close" as const,
-                    label: "Close Without Action",
-                    desc: "Close the incident and notify the manager",
-                  },
-                ].map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                      rejectNextStep === option.value
-                        ? "border-brand-primary bg-brand-primary/5"
-                        : "border-border hover:bg-card-hover"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="rejectNextStep"
-                      checked={rejectNextStep === option.value}
-                      onChange={() => setRejectNextStep(option.value)}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">
-                        {option.label}
-                      </p>
-                      <p className="text-xs text-text-tertiary">{option.desc}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRejectModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleReject}
-                disabled={rejectReason.length < 20}
-              >
-                Confirm Rejection
-              </Button>
-            </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRejectModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleReject} disabled={rejectReason.length < 20 || submitting}>
+              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm Rejection
+            </Button>
           </div>
         </div>
       </Modal>
 
       {/* Approve Modal */}
       <Modal open={approveModalOpen} onOpenChange={setApproveModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
           <h3 className="text-lg font-semibold text-text-primary">Approve Document</h3>
           <p className="text-sm text-text-secondary">
             This will approve the disciplinary document and prompt meeting scheduling.
           </p>
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Are you sure you want to approve this document? Once approved, the system
-              will prompt you to schedule a meeting with the employee.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleApproveConfirm}>
-                <CheckCircle className="mr-1.5 h-4 w-4" />
-                Approve & Schedule Meeting
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Approve Modal */}
-      <Modal open={approveModalOpen} onOpenChange={setApproveModalOpen}>
-        <div className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div className="fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-text-primary">Approve Document</h3>
-          <p className="text-sm text-text-secondary">
-            This will approve the disciplinary document and prompt meeting scheduling.
-          </p>
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Are you sure you want to approve this document? Once approved, the system
-              will prompt you to schedule a meeting with the employee.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setApproveModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleApproveConfirm}>
-                <CheckCircle className="mr-1.5 h-4 w-4" />
-                Approve & Schedule Meeting
-              </Button>
-            </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setApproveModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleApproveConfirm} disabled={submitting}>
+              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-1.5 h-4 w-4" />}
+              Approve & Schedule Meeting
+            </Button>
           </div>
         </div>
       </Modal>
     </PageContainer>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Confidence Bar
-// ---------------------------------------------------------------------------
-
-function ConfidenceBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="text-text-tertiary">{label}</span>
-        <span
-          className={
-            value >= 0.85
-              ? "text-brand-success"
-              : value >= 0.7
-                ? "text-brand-warning"
-                : "text-brand-error"
-          }
-        >
-          {Math.round(value * 100)}%
-        </span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-slate-light">
-        <div
-          className={`h-full rounded-full transition-all ${
-            value >= 0.85
-              ? "bg-brand-success"
-              : value >= 0.7
-                ? "bg-brand-warning"
-                : "bg-brand-error"
-          }`}
-          style={{ width: `${value * 100}%` }}
-        />
-      </div>
-    </div>
   );
 }
