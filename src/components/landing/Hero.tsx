@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Play, Shield, Users, Zap } from "lucide-react";
 
 /* ── Animation variants ─────────────────────────────────────────────────── */
 
@@ -13,7 +13,7 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.15, delayChildren: 0.2 },
+    transition: { staggerChildren: 0.12, delayChildren: 0.2 },
   },
 };
 
@@ -28,15 +28,7 @@ const itemVariants: Variants = {
 
 /* ── Floating dashboard accent elements ──────────────────────────────────── */
 
-interface FloatingElement {
-  x: string;
-  y: string;
-  width: string;
-  height: string;
-  delay: number;
-}
-
-const floatingElements: FloatingElement[] = [
+const floatingElements = [
   { x: "10%", y: "18%", width: "7rem", height: "1.5rem", delay: 0 },
   { x: "58%", y: "12%", width: "5rem", height: "1.25rem", delay: 0.6 },
   { x: "72%", y: "55%", width: "4rem", height: "4rem", delay: 1.2 },
@@ -49,16 +41,13 @@ const floatingElements: FloatingElement[] = [
 export default function Hero() {
   return (
     <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-20">
-      {/* ── Background ambient glow ────────────────────────────────────── */}
-      <div
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
+      {/* Background ambient glow */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-brand-primary/5 blur-3xl" />
         <div className="absolute -bottom-40 right-1/4 h-96 w-96 rounded-full bg-brand-warning/5 blur-3xl" />
       </div>
 
-      {/* ── Text content ───────────────────────────────────────────────── */}
+      {/* Text content */}
       <motion.div
         className="relative z-10 mx-auto max-w-5xl text-center"
         variants={containerVariants}
@@ -68,49 +57,69 @@ export default function Hero() {
         {/* Badge */}
         <motion.div variants={itemVariants} className="mb-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-4 py-1.5 text-sm font-medium text-brand-primary">
-            ✦ Now in Public Beta
+            <Zap className="h-3.5 w-3.5" /> The Only AI-Powered Discipline Platform
           </span>
         </motion.div>
 
-        {/* Heading */}
+        {/* H1 - SEO targeted */}
         <motion.h1
           variants={itemVariants}
-          className="font-display text-5xl font-extrabold leading-tight text-text-primary sm:text-6xl lg:text-7xl"
+          className="font-display text-4xl font-extrabold leading-tight text-text-primary sm:text-5xl lg:text-7xl"
         >
-          HMN/PPL <span className="text-brand-primary">HR Platform</span>
+          AI-Powered{" "}
+          <span className="text-brand-primary">Employee Discipline</span>{" "}
+          and Compliance Software
         </motion.h1>
 
-        {/* Subtitle */}
+        {/* Subtitle - problem statement */}
         <motion.p
           variants={itemVariants}
-          className="mx-auto mt-6 max-w-2xl font-body text-xl font-medium text-text-secondary sm:text-2xl"
+          className="mx-auto mt-6 max-w-2xl font-body text-lg font-medium text-text-secondary sm:text-xl"
         >
-          Streamline hiring, onboarding, compliance, and employee lifecycle management
-          with intelligent automation.
+          Stop drowning in manual discipline tracking. Our autonomous AI agents handle
+          progressive discipline, manager coaching, state-specific paperwork, and compliance
+          across every jurisdiction you operate in.
         </motion.p>
+
+        {/* Social proof metrics */}
+        <motion.div
+          variants={itemVariants}
+          className="mx-auto mt-6 flex max-w-md items-center justify-center gap-6 text-sm text-text-tertiary"
+        >
+          <span className="flex items-center gap-1.5">
+            <Shield className="h-4 w-4 text-brand-success" /> SOC 2 Compliant
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Users className="h-4 w-4 text-brand-primary" /> 99.9% Uptime
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Zap className="h-4 w-4 text-brand-warning" /> AI-Powered
+          </span>
+        </motion.div>
 
         {/* CTA Buttons */}
         <motion.div
           variants={itemVariants}
-          className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
+          className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
           <Link href="/signup">
             <Button size="lg" className="px-8 py-4 text-lg">
-              Get Started — Free Trial
+              Start Free Trial
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
-          <Link href="#features">
-            <Button variant="outline" size="lg" className="px-8 py-4 text-lg">
-              See Features
+          <Link href="/demo">
+            <Button variant="outline" size="lg" className="gap-2 px-8 py-4 text-lg">
+              <Play className="h-4 w-4" />
+              Watch Demo
             </Button>
           </Link>
         </motion.div>
       </motion.div>
 
-      {/* ── Animated dashboard preview ─────────────────────────────────── */}
+      {/* Animated dashboard preview */}
       <motion.div
-        className="relative mx-auto mt-16 w-full max-w-4xl"
+        className="relative mx-auto mt-12 w-full max-w-4xl"
         initial={{ opacity: 0, y: 60 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.6, ease: easeOut }}
@@ -133,11 +142,23 @@ export default function Hero() {
             <div className="flex flex-col gap-3 sm:ml-24">
               <div className="h-6 w-40 rounded bg-brand-slate-lighter/30" />
               <div className="grid grid-cols-3 gap-3">
-                <div className="h-20 rounded-lg bg-brand-slate-light/40" />
-                <div className="h-20 rounded-lg bg-brand-slate-light/40" />
-                <div className="h-20 rounded-lg border border-brand-primary/30 bg-brand-primary/20" />
+                <div className="flex flex-col items-center justify-center rounded-lg bg-brand-slate-light/40 p-3">
+                  <div className="text-xs text-text-tertiary">Health Score</div>
+                  <div className="mt-1 text-2xl font-bold text-green-400">94</div>
+                </div>
+                <div className="flex flex-col items-center justify-center rounded-lg bg-brand-slate-light/40 p-3">
+                  <div className="text-xs text-text-tertiary">Open Cases</div>
+                  <div className="mt-1 text-2xl font-bold text-amber-400">7</div>
+                </div>
+                <div className="flex flex-col items-center justify-center rounded-lg border border-brand-primary/30 bg-brand-primary/20 p-3">
+                  <div className="text-xs text-brand-primary">Turnover</div>
+                  <div className="mt-1 text-2xl font-bold text-brand-primary">12%</div>
+                </div>
               </div>
-              <div className="h-40 rounded-lg bg-brand-dark-slate/50" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="h-32 rounded-lg bg-brand-dark-slate/50" />
+                <div className="h-32 rounded-lg bg-brand-dark-slate/50" />
+              </div>
             </div>
 
             {/* Floating accent elements */}
@@ -146,16 +167,8 @@ export default function Hero() {
                 key={i}
                 className="absolute rounded-md border border-brand-primary/20 bg-brand-primary/10"
                 style={{ left: el.x, top: el.y, width: el.width, height: el.height }}
-                animate={{
-                  y: [0, -10, 0],
-                  opacity: [0.4, 0.7, 0.4],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  delay: el.delay,
-                  ease: "easeInOut",
-                }}
+                animate={{ y: [0, -10, 0], opacity: [0.4, 0.7, 0.4] }}
+                transition={{ duration: 3, repeat: Infinity, delay: el.delay, ease: "easeInOut" }}
                 aria-hidden="true"
               />
             ))}
