@@ -34,7 +34,7 @@ const securityHeaders = [
       // Allow images from Supabase storage and data/blob URIs
       "img-src 'self' data: blob: https://*.supabase.co",
       // Allow API calls to Supabase and OAuth providers
-      "connect-src 'self' https://*.supabase.co https://accounts.google.com https://login.microsoftonline.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://login.microsoftonline.com",
     ].join("; "),
   },
 ];
@@ -58,12 +58,6 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
   },
 
-  // Performance: exclude unused locales
-  i18n: {
-    locales: ["en"],
-    defaultLocale: "en",
-  },
-
   async headers() {
     return [
       {
@@ -73,7 +67,11 @@ const nextConfig = {
     ];
   },
 
-  webpack: (config, { isServer }) => {
+  webpack: (config, { dev, isServer }) => {
+    if (dev && process.platform === "win32") {
+      config.cache = false;
+    }
+
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,

@@ -19,6 +19,25 @@ import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { NotificationBell } from "@/components/domain/NotificationBell";
 import { Button } from "@/components/ui/button";
 
+function getDisplayName(user: ReturnType<typeof useAuthStore.getState>["user"]) {
+  if (!user) return "Guest";
+
+  const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  if (fullName) return fullName;
+
+  const emailPrefix = user.email?.split("@")[0]?.trim();
+  return emailPrefix || "User";
+}
+
+function getDisplayInitials(user: ReturnType<typeof useAuthStore.getState>["user"]) {
+  if (!user) return "U";
+
+  const initials = `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.trim();
+  if (initials) return initials.toUpperCase();
+
+  return user.email?.[0]?.toUpperCase() ?? "U";
+}
+
 export function Header() {
   const router = useRouter();
   const breakpoint = useBreakpoint();
@@ -158,7 +177,7 @@ export function Header() {
                 />
               ) : (
                 <span className="text-xs font-semibold text-text-primary">
-                  {user ? `${user.firstName[0]}${user.lastName[0]}` : "U"}
+                  {getDisplayInitials(user)}
                 </span>
               )}
             </div>
@@ -166,7 +185,7 @@ export function Header() {
             {/* Name & Role — hidden on small screens */}
             <div className="hidden text-left sm:block">
               <p className="text-sm font-medium leading-tight text-text-primary">
-                {user ? `${user.firstName} ${user.lastName}` : "Guest"}
+                {getDisplayName(user)}
               </p>
               <p className="text-xs leading-tight text-text-tertiary">
                 {user ? formatRole(user.role) : "Sign in"}
@@ -194,7 +213,7 @@ export function Header() {
               {/* User info header */}
               <div className="border-b border-border px-4 py-3">
                 <p className="text-sm font-medium text-text-primary">
-                  {user ? `${user.firstName} ${user.lastName}` : "Guest"}
+                  {getDisplayName(user)}
                 </p>
                 <p className="text-xs text-text-tertiary">{user?.email ?? ""}</p>
               </div>

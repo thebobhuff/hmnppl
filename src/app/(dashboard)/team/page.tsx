@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { APIErrorFallback } from "@/components/domain/ErrorBoundary";
 import { usersAPI, type UserResponse, type APIError } from "@/lib/api/client";
 import {
@@ -54,6 +55,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<APIError | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const { toast } = useToast();
 
   const breadcrumbs = usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
@@ -103,11 +105,42 @@ export default function TeamPage() {
   const handleInvite = async (email: string, role: string) => {
     setInviteLoading(true);
     try {
-      await usersAPI.invite({ email, role });
+      const result = await usersAPI.invite({ email, role });
       setInviteModalOpen(false);
       await fetchUsers();
+
+      if (result.inviteLink) {
+        try {
+          await navigator.clipboard.writeText(result.inviteLink);
+          toast({
+            title: result.simulatedEmail ? "Invite link copied" : "Invitation sent",
+            description: result.simulatedEmail
+              ? "Email delivery is simulated in this environment. The invite link was copied to your clipboard so the tester can sign in immediately."
+              : "Invitation created successfully. The invite link was copied to your clipboard.",
+            variant: "success",
+          });
+        } catch {
+          toast({
+            title: result.simulatedEmail ? "Invite ready for testing" : "Invitation sent",
+            description: result.inviteLink,
+            variant: "info",
+            duration: 10000,
+          });
+        }
+      } else {
+        toast({
+          title: "Invitation sent",
+          description: "The user was invited successfully.",
+          variant: "success",
+        });
+      }
     } catch (err) {
       console.error("[team] Invite failed:", err);
+      toast({
+        title: "Invite failed",
+        description: "The team member could not be invited.",
+        variant: "error",
+      });
     } finally {
       setInviteLoading(false);
     }

@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Prompt templates for all AI agents.
  * Ported from Python backend — same prompts, TypeScript implementation.

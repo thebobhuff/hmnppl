@@ -59,13 +59,17 @@ export async function createIncident(
   reporterId: string,
   employeeId: string,
   input: IncidentCreateInput,
-): Promise<{ incident: IncidentResponse; referenceNumber: string }> {
+): Promise<{
+  incident: IncidentResponse;
+  referenceNumber: string;
+  employeeContext: { name: string; jobTitle: string | null };
+}> {
   const supabase = createAdminClient();
 
   // 1. Verify employee is a direct report of the reporter
   const { data: employee, error: employeeError } = await supabase
     .from("users")
-    .select("id, company_id, manager_id, status")
+    .select("id, company_id, manager_id, status, first_name, last_name, job_title")
     .eq("id", employeeId)
     .single();
 
@@ -152,6 +156,10 @@ export async function createIncident(
   return {
     incident: mapToResponse(data, input.witness_ids),
     referenceNumber,
+    employeeContext: {
+      name: `${employee.first_name} ${employee.last_name}`.trim() || "Employee",
+      jobTitle: employee.job_title ?? null,
+    },
   };
 }
 

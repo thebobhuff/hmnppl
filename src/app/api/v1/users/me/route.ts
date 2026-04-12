@@ -1,17 +1,50 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/require-role";
 import type { UserRole } from "@/types";
-import { getUser, updateOwnUser } from "@/lib/services/user-service";
+import { getUser, updateOwnUser, updateUser } from "@/lib/services/user-service";
+
+function deriveFallbackName(email: string) {
+  const localPart = email.split("@")[0] ?? "user";
+  const normalized = localPart.replace(/[._-]+/g, " ").trim();
+  const parts = normalized.split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) {
+    return { firstName: "Invited", lastName: "User" };
+  }
+
+  const [first = "Invited", ...rest] = parts;
+  const toTitleCase = (value: string) =>
+    value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+
+  return {
+    firstName: toTitleCase(first),
+    lastName: rest.length > 0 ? rest.map(toTitleCase).join(" ") : "User",
+  };
+}
 
 function mapRole(role: string): UserRole {
   return role.toUpperCase() as UserRole;
 }
 
 export const GET = withAuth(async (_request, _context, { user }) => {
-  const fullUser = await getUser(user.companyId, user.id);
+  let fullUser = await getUser(user.companyId, user.id);
 
   if (!fullUser) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  const needsActivation = fullUser.status === "invited";
+  const needsNameFallback = !fullUser.first_name.trim() || !fullUser.last_name.trim();
+
+  if (needsActivation || needsNameFallback) {
+    const fallbackName = deriveFallbackName(fullUser.email);
+    fullUser = await updateUser(user.companyId, user.id, {
+      status: needsActivation ? "active" : fullUser.status,
+      first_name: needsNameFallback ? fallbackName.firstName : fullUser.first_name,
+      last_name: needsNameFallback ? fallbackName.lastName : fullUser.last_name,
+      hire_date: fullUser.hire_date ?? new Date().toISOString().split("T")[0],
+      last_login_at: new Date().toISOString(),
+    } as never);
   }
 
   return NextResponse.json({

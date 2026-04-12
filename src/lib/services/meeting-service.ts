@@ -79,8 +79,26 @@ export async function createMeeting(
 export async function getMeeting(
   companyId: string,
   meetingId: string,
+  participantUserId?: string,
 ): Promise<MeetingResponse | null> {
   const supabase = createAdminClient();
+
+  if (participantUserId) {
+    const { data: participantAccess, error: participantError } = await supabase
+      .from("meeting_participants")
+      .select("meeting_id")
+      .eq("meeting_id", meetingId)
+      .eq("user_id", participantUserId)
+      .maybeSingle();
+
+    if (participantError) {
+      throw new Error(`Failed to validate meeting access: ${participantError.message}`);
+    }
+
+    if (!participantAccess) {
+      return null;
+    }
+  }
 
   const { data, error } = await supabase
     .from("meetings")
@@ -108,8 +126,33 @@ export async function listMeetings(
   status?: string,
   cursor?: string,
   limit = 20,
+  participantUserId?: string,
 ) {
   const supabase = createAdminClient();
+
+  let allowedMeetingIds: string[] | null = null;
+
+  if (participantUserId) {
+    const { data: participantRows, error: participantError } = await supabase
+      .from("meeting_participants")
+      .select("meeting_id")
+      .eq("user_id", participantUserId);
+
+    if (participantError) {
+      throw new Error(`Failed to scope meetings: ${participantError.message}`);
+    }
+
+    allowedMeetingIds = (participantRows ?? []).map((row) => row.meeting_id as string);
+
+    if (allowedMeetingIds.length === 0) {
+      return {
+        meetings: [],
+        total: 0,
+        hasMore: false,
+        nextCursor: undefined,
+      };
+    }
+  }
 
   let query = supabase
     .from("meetings")
@@ -120,6 +163,9 @@ export async function listMeetings(
 
   if (status) {
     query = query.eq("status", status);
+  }
+  if (allowedMeetingIds) {
+    query = query.in("id", allowedMeetingIds);
   }
   if (cursor) {
     query = query.gt("scheduled_at", cursor);

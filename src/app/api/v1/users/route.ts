@@ -60,14 +60,18 @@ export const POST = withAuth({ roles: roleGuards.companyAdminOnly }, async (requ
   }
 
   try {
-    const invitedUser = await inviteUser(
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL || request.headers.get("origin") || "http://localhost:3000";
+
+    const inviteResult = await inviteUser(
       user.companyId,
       parsed.data.email,
       parsed.data.role,
+      siteUrl,
       parsed.data.department_id,
       parsed.data.manager_id,
     );
-    return NextResponse.json({ user: invitedUser }, { status: 201 });
+    return NextResponse.json(inviteResult, { status: 201 });
   } catch (error) {
     console.error("[users:invite] Failed:", error);
     return NextResponse.json({ error: "Failed to invite user" }, { status: 500 });

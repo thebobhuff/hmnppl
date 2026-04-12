@@ -14,6 +14,10 @@ import {
 } from "@/lib/services/incident-service";
 import { runAIPipeline } from "@/lib/agents/pipeline";
 import {
+  createNotificationsForUsers,
+  getNotificationRecipientIds,
+} from "@/lib/services/notification-service";
+import {
   incidentCreateSchema,
   incidentListFiltersSchema,
 } from "@/lib/validations/incident";
@@ -86,33 +90,68 @@ export const POST = withAuth({ roles: roleGuards.manager }, async (request) => {
   }
 
   try {
-    const { incident, referenceNumber } = await createIncident(
+    const { incident, referenceNumber, employeeContext } = await createIncident(
       user.companyId,
       user.id,
       parsed.data.employee_id,
       parsed.data,
     );
 
-    // Fire AI pipeline asynchronously (non-blocking)
-  // The pipeline updates the incident in DB when complete
-  runAIPipeline({
-    incidentId: incident.id,
-    companyId,
-    employeeId,
-    incidentType: parsed.data.type,
-    description: parsed.data.description,
-    severity: parsed.data.severity,
-    incidentDate: parsed.data.incident_date,
-    referenceNumber,
-    previousIncidentCount: incident.previous_incident_count ?? 0,
-    policySnapshot: (incident.policy_snapshot as Record<string, unknown>[]) ?? [],
-    employeeName: undefined, // Will be fetched by pipeline if needed
-  }).catch((pipelineErr) => {
-    console.error("[incidents:create] AI pipeline failed (non-fatal):", pipelineErr);
-    // Pipeline failure doesn't affect incident creation — it stays in ai_evaluating
-  });
+    try {
+      const reviewerIds = await getNotificationRecipientIds(
+        user.companyId,
+        ["company_admin", "hr_agent"],
+        [user.id],
+      );
 
-  return NextResponse.json(
+      await Promise.all([
+        createNotificationsForUsers({
+          companyId: user.companyId,
+          userIds: [user.id],
+          type: "incident_submitted",
+          title: "Incident recorded",
+          message: `${referenceNumber} was recorded for ${employeeContext.name} and sent for AI evaluation.`,
+          entityType: "incident",
+          entityId: incident.id,
+        }),
+        createNotificationsForUsers({
+          companyId: user.companyId,
+          userIds: reviewerIds,
+          type: "incident_submitted",
+          title: "New incident reported",
+          message: `${user.firstName} ${user.lastName} submitted ${referenceNumber} for ${employeeContext.name}.`,
+          entityType: "incident",
+          entityId: incident.id,
+        }),
+      ]);
+    } catch (notificationError) {
+      console.error(
+        "[incidents:create] Notification fan-out failed (non-fatal):",
+        notificationError,
+      );
+    }
+
+    // Fire AI pipeline asynchronously (non-blocking)
+    // The pipeline updates the incident in DB when complete
+    runAIPipeline({
+      incidentId: incident.id,
+      companyId: user.companyId,
+      employeeId: parsed.data.employee_id,
+      incidentType: parsed.data.type,
+      description: parsed.data.description,
+      severity: parsed.data.severity,
+      incidentDate: parsed.data.incident_date,
+      referenceNumber,
+      previousIncidentCount: incident.previous_incident_count ?? 0,
+      policySnapshot: (incident.policy_snapshot as Record<string, unknown>[]) ?? [],
+      employeeName: employeeContext.name,
+      employeeTitle: employeeContext.jobTitle ?? undefined,
+    }).catch((pipelineErr) => {
+      console.error("[incidents:create] AI pipeline failed (non-fatal):", pipelineErr);
+      // Pipeline failure doesn't affect incident creation — it stays in ai_evaluating
+    });
+
+    return NextResponse.json(
       {
         incident: {
           id: incident.id,

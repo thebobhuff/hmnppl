@@ -217,16 +217,16 @@ export function SignupForm() {
 
   // --- Render ---
   return (
-    <div className="card rounded-2xl border border-border bg-card p-8 shadow-lg">
+    <div className="card rounded-2xl border border-border bg-card p-5 shadow-lg sm:p-8">
       {/* Logo / Title */}
-      <div className="mb-8 text-center">
+      <div className="mb-6 text-center sm:mb-8">
         <div className="flex justify-center">
           <Image
             src="/logo.png"
             alt="HMN/PPL"
             width={64}
             height={64}
-            className="h-16 w-auto"
+            className="h-14 w-auto sm:h-16"
           />
         </div>
         <p className="mt-2 text-sm text-text-tertiary">Create your workspace</p>
@@ -250,7 +250,7 @@ export function SignupForm() {
       </Button>
 
       {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
+      <div className="my-5 flex items-center gap-3 sm:my-6">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs text-text-tertiary">or</span>
         <div className="h-px flex-1 bg-border" />
@@ -269,7 +269,7 @@ export function SignupForm() {
         )}
 
         {/* Name row */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField
             label="First name"
             required

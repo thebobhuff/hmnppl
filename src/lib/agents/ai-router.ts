@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * AI Router — model-agnostic LLM routing with OpenRouter.
  *

@@ -266,7 +266,7 @@ export const usersAPI = {
     department_id?: string;
     manager_id?: string;
   }) =>
-    request<{ user: UserResponse }>(`/users`, {
+    request<{ user: UserResponse; inviteLink?: string; simulatedEmail?: boolean }>(`/users`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

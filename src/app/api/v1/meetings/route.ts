@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { createMeeting, listMeetings } from "@/lib/services/meeting-service";
 import { generateAgenda } from "@/lib/services/ai-proxy-service";
 
-export const GET = withAuth({ roles: roleGuards.hrAgent }, async (request) => {
+export const GET = withAuth({ roles: roleGuards.manager }, async (request) => {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -22,6 +22,7 @@ export const GET = withAuth({ roles: roleGuards.hrAgent }, async (request) => {
       status,
       cursor,
       Math.min(limit, 100),
+      user.role === "manager" ? user.id : undefined,
     );
     return NextResponse.json(result);
   } catch (error) {

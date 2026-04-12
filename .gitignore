@@ -22,6 +22,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+build_log.txt
+build_output*.txt
+build_result.log
+dev_log*.txt
 
 # local env files
 .env
@@ -35,7 +39,6 @@ yarn-error.log*
 next-env.d.ts
 
 # IDE
-.vscode/
 .idea/
 
 # Python

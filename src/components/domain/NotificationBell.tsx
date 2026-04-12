@@ -7,10 +7,12 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Bell, CheckCheck, Inbox } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
   id: string;
@@ -18,71 +20,169 @@ interface Notification {
   title: string;
   message: string;
   read: boolean;
-  time: string;
-  entityLink?: string;
+  created_at: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    type: "incident_submitted",
-    title: "New Incident Reported",
-    message: "David Park submitted an incident for John Smith.",
-    read: false,
-    time: "2m ago",
-    entityLink: "/incident-queue/1",
-  },
-  {
-    id: "2",
-    type: "document_approved",
-    title: "Document Approved",
-    message: "Maria Garcia approved the written warning for Jane Doe.",
-    read: false,
-    time: "15m ago",
-    entityLink: "/incident-queue/2",
-  },
-  {
-    id: "3",
-    type: "meeting_scheduled",
-    title: "Meeting Scheduled",
-    message: "Disciplinary review for J. Smith scheduled for Apr 5 at 2:00 PM.",
-    read: true,
-    time: "1h ago",
-    entityLink: "/meetings/1",
-  },
-  {
-    id: "4",
-    type: "document_signed",
-    title: "Document Signed",
-    message: "Bob Johnson signed the verbal warning document.",
-    read: true,
-    time: "3h ago",
-    entityLink: "/documents/3",
-  },
-  {
-    id: "5",
-    type: "ai_evaluation_complete",
-    title: "AI Evaluation Complete",
-    message: "AI has evaluated INC-2026-0040 (Bob Johnson — Absence).",
-    read: true,
-    time: "5h ago",
-    entityLink: "/incident-queue/3",
-  },
-];
+function formatRelativeTime(isoTimestamp: string): string {
+  const diffMs = Date.now() - new Date(isoTimestamp).getTime();
+  const diffMinutes = Math.max(1, Math.floor(diffMs / 60_000));
+
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return new Date(isoTimestamp).toLocaleDateString();
+}
+
+function getEntityLink(notification: Notification): string | undefined {
+  if (!notification.entity_id) return undefined;
+
+  if (notification.entity_type === "incident") {
+    return `/incident-queue/${notification.entity_id}`;
+  }
+
+  if (notification.entity_type === "disciplinary_action") {
+    return `/documents/${notification.entity_id}`;
+  }
+
+  if (notification.entity_type === "meeting") {
+    return `/meetings/${notification.entity_id}`;
+  }
+
+  return undefined;
+}
 
 export function NotificationBell() {
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const router = useRouter();
+  const [supabase] = useState(() => createClient());
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const loadNotifications = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("id, type, title, message, read, created_at, entity_type, entity_id")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error("[notifications] Failed to load notifications:", error.message);
+      setLoading(false);
+      return;
+    }
+
+    setNotifications(data ?? []);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    let disposed = false;
+    let channelName = "";
+
+    const setup = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (disposed) {
+        return;
+      }
+
+      await loadNotifications();
+
+      if (!user) {
+        return;
+      }
+
+      channelName = `notifications:${user.id}`;
+      supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            void loadNotifications();
+          },
+        )
+        .subscribe();
+    };
+
+    void setup();
+
+    const pollId = window.setInterval(() => {
+      void loadNotifications();
+    }, 5000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(pollId);
+      if (channelName) {
+        void supabase.removeChannel(supabase.channel(channelName));
+      }
+    };
+  }, [loadNotifications, supabase]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  const markAllRead = useCallback(async () => {
+    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length === 0) {
+      return;
+    }
 
-  const markRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  };
+    const readAt = new Date().toISOString();
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true, read_at: readAt })
+      .in("id", unreadIds);
+
+    if (error) {
+      console.error("[notifications] Failed to mark all as read:", error.message);
+      await loadNotifications();
+    }
+  }, [loadNotifications, notifications, supabase]);
+
+  const markRead = useCallback(
+    async (id: string) => {
+      const readAt = new Date().toISOString();
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true, read_at: readAt })
+        .eq("id", id);
+
+      if (error) {
+        console.error("[notifications] Failed to mark as read:", error.message);
+        await loadNotifications();
+      }
+    },
+    [loadNotifications, supabase],
+  );
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -127,7 +227,11 @@ export function NotificationBell() {
 
           {/* List */}
           <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {loading ? (
+              <div className="px-4 py-6 text-center text-sm text-text-tertiary">
+                Loading notifications...
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
                 <Inbox className="h-8 w-8 text-text-tertiary" />
                 <p className="text-sm text-text-tertiary">No notifications</p>
@@ -136,10 +240,12 @@ export function NotificationBell() {
               notifications.map((notif) => (
                 <button
                   key={notif.id}
-                  onClick={() => {
-                    markRead(notif.id);
-                    if (notif.entityLink) {
-                      window.location.href = notif.entityLink;
+                  onClick={async () => {
+                    await markRead(notif.id);
+                    const entityLink = getEntityLink(notif);
+                    if (entityLink) {
+                      setOpen(false);
+                      router.push(entityLink);
                     }
                   }}
                   className={`w-full border-b border-border px-4 py-3 text-left transition-colors hover:bg-card-hover ${
@@ -163,7 +269,9 @@ export function NotificationBell() {
                       <p className="mt-0.5 line-clamp-2 text-xs text-text-tertiary">
                         {notif.message}
                       </p>
-                      <p className="mt-1 text-[10px] text-text-tertiary">{notif.time}</p>
+                      <p className="mt-1 text-[10px] text-text-tertiary">
+                        {formatRelativeTime(notif.created_at)}
+                      </p>
                     </div>
                   </div>
                 </button>

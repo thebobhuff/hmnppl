@@ -149,7 +149,7 @@ export async function POST(request: Request) {
         type: "invite",
         email: invite.email,
         options: {
-          redirectTo: `${siteUrl}/auth/callback?next=/onboarding/accept`,
+          redirectTo: `${siteUrl}/auth/accept?next=/dashboard`,
         },
       });
 

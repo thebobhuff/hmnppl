@@ -42,7 +42,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://*.supabase.co",
-    "connect-src 'self' https://*.supabase.co https://accounts.google.com https://login.microsoftonline.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://login.microsoftonline.com",
   ].join("; "),
 };
 
@@ -56,6 +56,7 @@ const PUBLIC_ROUTES = [
   "/pricing",
   "/login",
   "/signup",
+  "/auth/accept",
   "/auth/callback",
   "/api/v1/csrf-token",
 ];

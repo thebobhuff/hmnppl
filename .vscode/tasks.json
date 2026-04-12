@@ -1,0 +1,207 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "frontend: clean",
+      "type": "shell",
+      "command": "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'node.exe' -and ($_.CommandLine -like '*HMNPPL*next*' -or $_.CommandLine -like '*HMNPPL*npm*run*dev*' -or $_.CommandLine -like '*HMNPPL*npm*start*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; if (Test-Path '.next') { Remove-Item -Path '.next' -Recurse -Force -ErrorAction SilentlyContinue }",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "frontend: install deps",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build"
+    },
+    {
+      "label": "frontend: dev",
+      "type": "shell",
+      "command": "$major = [int](((node -v).TrimStart('v')).Split('.')[0]); if ($major -ne 20) { Write-Warning 'This repo pins Node 20 in .nvmrc; other versions can cause Next.js trace-file issues on Windows.' }; npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: dev fresh",
+      "type": "shell",
+      "command": "Write-Host 'Starting frontend after clean reset'",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": [
+        "frontend: clean",
+        "frontend: dev"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: build",
+      "type": "shell",
+      "command": "$major = [int](((node -v).TrimStart('v')).Split('.')[0]); if ($major -ne 20) { Write-Warning 'This repo pins Node 20 in .nvmrc; other versions can cause Next.js trace-file issues on Windows.' }; npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build"
+    },
+    {
+      "label": "frontend: start",
+      "type": "shell",
+      "command": "$major = [int](((node -v).TrimStart('v')).Split('.')[0]); if ($major -ne 20) { Write-Warning 'This repo pins Node 20 in .nvmrc; other versions can cause Next.js trace-file issues on Windows.' }; npm start",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test"
+    },
+    {
+      "label": "frontend: format",
+      "type": "shell",
+      "command": "npm run format",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "frontend: test",
+      "type": "shell",
+      "command": "npm test",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test"
+    },
+    {
+      "label": "frontend: test watch",
+      "type": "shell",
+      "command": "npm run test:watch",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: coverage",
+      "type": "shell",
+      "command": "npm run test:coverage",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test"
+    },
+    {
+      "label": "backend: create venv",
+      "type": "shell",
+      "command": "python -m venv .venv",
+      "options": {
+        "cwd": "${workspaceFolder}\\server"
+      },
+      "group": "build"
+    },
+    {
+      "label": "backend: install deps",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt",
+      "options": {
+        "cwd": "${workspaceFolder}\\server"
+      },
+      "dependsOn": [
+        "backend: create venv"
+      ],
+      "dependsOrder": "sequence",
+      "group": "build"
+    },
+    {
+      "label": "backend: dev",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+      "options": {
+        "cwd": "${workspaceFolder}\\server"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: test",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest",
+      "options": {
+        "cwd": "${workspaceFolder}\\server"
+      },
+      "group": "test"
+    },
+    {
+      "label": "supabase: start",
+      "type": "shell",
+      "command": "supabase start",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "supabase: db push",
+      "type": "shell",
+      "command": "supabase db push",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "tests: rls",
+      "type": "shell",
+      "command": ".\\server\\.venv\\Scripts\\python.exe -m pytest tests/rls",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test"
+    },
+    {
+      "label": "install: all",
+      "type": "shell",
+      "command": "Write-Host 'Install complete'",
+      "dependsOn": [
+        "frontend: install deps",
+        "backend: install deps"
+      ],
+      "dependsOrder": "sequence",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build"
+    },
+    {
+      "label": "dev: full stack",
+      "type": "shell",
+      "command": "Write-Host 'Full stack tasks started'",
+      "dependsOn": [
+        "supabase: start",
+        "backend: dev",
+        "frontend: dev"
+      ],
+      "dependsOrder": "parallel",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

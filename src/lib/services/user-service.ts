@@ -2,6 +2,7 @@
  * User service — user management and employee timeline.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendTeamInviteEmail } from "@/lib/services/email";
 
 export interface UserResponse {
   id: string;
@@ -210,23 +211,46 @@ export async function inviteUser(
   companyId: string,
   email: string,
   role: string,
+  siteUrl: string,
   departmentId?: string | null,
   managerId?: string | null,
-): Promise<UserResponse> {
+): Promise<{ user: UserResponse; inviteLink: string; simulatedEmail: boolean }> {
   const supabase = createAdminClient();
+
+  const { data: company } = await supabase
+    .from("companies")
+    .select("name")
+    .eq("id", companyId)
+    .single();
+
+  const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    type: "invite",
+    email,
+    options: {
+      redirectTo: `${siteUrl}/auth/accept?next=/dashboard`,
+    },
+  });
+
+  if (linkError || !linkData?.properties?.action_link) {
+    throw new Error(`Failed to generate invite link: ${linkError?.message ?? "Unknown error"}`);
+  }
 
   const { data, error } = await supabase
     .from("users")
-    .insert({
-      company_id: companyId,
-      email,
-      role,
-      department_id: departmentId ?? null,
-      manager_id: managerId ?? null,
-      first_name: "",
-      last_name: "",
-      status: "invited",
-    })
+    .upsert(
+      {
+        id: linkData.user.id,
+        company_id: companyId,
+        email,
+        role,
+        department_id: departmentId ?? null,
+        manager_id: managerId ?? null,
+        first_name: "",
+        last_name: "",
+        status: "invited",
+      },
+      { onConflict: "company_id,email" },
+    )
     .select()
     .single();
 
@@ -234,7 +258,23 @@ export async function inviteUser(
     throw new Error(`Failed to invite user: ${error.message}`);
   }
 
-  return mapToResponse(data);
+  let simulatedEmail = false;
+  try {
+    const emailResult = await sendTeamInviteEmail(
+      email,
+      linkData.properties.action_link,
+      company?.name ?? "your company",
+    );
+    simulatedEmail = Boolean((emailResult as { simulated?: boolean }).simulated);
+  } catch (inviteEmailError) {
+    console.error("[users:invite] Invite email failed (non-fatal):", inviteEmailError);
+  }
+
+  return {
+    user: mapToResponse(data),
+    inviteLink: linkData.properties.action_link,
+    simulatedEmail,
+  };
 }
 
 export async function updateUser(
@@ -247,6 +287,10 @@ export async function updateUser(
     job_title: string | null;
     phone: string | null;
     status: string;
+    first_name: string;
+    last_name: string;
+    hire_date: string | null;
+    last_login_at: string | null;
   }>,
 ): Promise<UserResponse> {
   const supabase = createAdminClient();
@@ -256,7 +300,7 @@ export async function updateUser(
     .update(updates)
     .eq("id", userId)
     .eq("company_id", companyId)
-    .select()
+    .select("*, companies(name)")
     .single();
 
   if (error) {

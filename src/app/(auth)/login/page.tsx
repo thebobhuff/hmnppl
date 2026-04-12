@@ -13,8 +13,12 @@ export const metadata = {
  */
 export default function LoginPage() {
   return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
+    <div className="flex min-h-screen items-center justify-center bg-brand-dark-slate px-4 py-12">
+      <div className="w-full max-w-[420px]">
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+      </div>
+    </div>
   );
 }

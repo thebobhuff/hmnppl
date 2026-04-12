@@ -20,6 +20,10 @@ import {
   buildIssueSimilarityPrompt,
 } from "./prompts";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  createNotificationsForUsers,
+  getNotificationRecipientIds,
+} from "@/lib/services/notification-service";
 
 // ============================================================================
 // Types
@@ -381,6 +385,46 @@ async function updateIncidentInDB(incidentId: string, result: PipelineResult) {
           follow_up_actions: result.aiRecommendation?.coaching_topics ?? [],
           document_content: result.generatedDocument,
         }, { onConflict: "incident_id" });
+      }
+    }
+
+    const { data: incident } = await supabase
+      .from("incidents")
+      .select("company_id, reported_by, reference_number")
+      .eq("id", incidentId)
+      .single();
+
+    if (incident) {
+      const escalationLabel = result.escalationLevel.replace(/_/g, " ");
+
+      await createNotificationsForUsers({
+        companyId: incident.company_id,
+        userIds: [incident.reported_by],
+        type: "ai_evaluation_complete",
+        title: "AI evaluation complete",
+        message: result.requiresHRReview || result.bypassesAgent
+          ? `${incident.reference_number} is ready for HR review with a recommended ${escalationLabel}.`
+          : `${incident.reference_number} has AI coaching and next-step guidance ready.` ,
+        entityType: "incident",
+        entityId: incidentId,
+      });
+
+      if (result.requiresHRReview || result.bypassesAgent) {
+        const reviewerIds = await getNotificationRecipientIds(
+          incident.company_id,
+          ["company_admin", "hr_agent"],
+          [incident.reported_by],
+        );
+
+        await createNotificationsForUsers({
+          companyId: incident.company_id,
+          userIds: reviewerIds,
+          type: "ai_evaluation_complete",
+          title: "Incident ready for review",
+          message: `${incident.reference_number} completed AI evaluation and is awaiting HR review.`,
+          entityType: "incident",
+          entityId: incidentId,
+        });
       }
     }
   } catch (err) {

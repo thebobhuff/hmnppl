@@ -7,13 +7,17 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getMeeting, updateMeeting } from "@/lib/services/meeting-service";
 import { summarizeMeeting } from "@/lib/services/ai-proxy-service";
 
-export const GET = withAuth({ roles: roleGuards.hrAgent }, async (_request, context) => {
+export const GET = withAuth({ roles: roleGuards.manager }, async (_request, context) => {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const params = await context.params;
   try {
-    const meeting = await getMeeting(user.companyId, params.id);
+    const meeting = await getMeeting(
+      user.companyId,
+      params.id,
+      user.role === "manager" ? user.id : undefined,
+    );
     if (!meeting) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ meeting });
   } catch (error) {
