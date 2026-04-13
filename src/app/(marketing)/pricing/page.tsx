@@ -61,12 +61,6 @@ const plans = [
   },
 ];
 
-export const metadata = {
-  title: "Pricing — HMN/PPL",
-  description:
-    "Pricing for AI-powered HR operations, policy workflows, and employee relations management.",
-};
-
 export default function PricingPage() {
   return (
     <>
