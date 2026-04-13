@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * AI Pipeline Orchestrator
  *
