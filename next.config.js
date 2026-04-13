@@ -26,7 +26,7 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       // Next.js dev + runtime requires eval and inline scripts
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com",
       // Allow Google Fonts stylesheets and inline styles
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // Allow Google Fonts files
@@ -34,7 +34,7 @@ const securityHeaders = [
       // Allow images from Supabase storage and data/blob URIs
       "img-src 'self' data: blob: https://*.supabase.co",
       // Allow API calls to Supabase and OAuth providers
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://login.microsoftonline.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://login.microsoftonline.com https://static.cloudflareinsights.com",
     ].join("; "),
   },
 ];
@@ -67,6 +67,17 @@ const nextConfig = {
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ],
     formats: ["image/avif", "image/webp"],
+  },
+
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.hmnppl.com" }],
+        destination: "https://hmnppl.com/:path*",
+        permanent: true,
+      },
+    ];
   },
 
   async headers() {
