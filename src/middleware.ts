@@ -1,5 +1,5 @@
 /**
- * Next.js middleware GÇö security headers + Supabase Auth session management.
+ * Next.js middleware â€” security headers + Supabase Auth session management.
  *
  * Responsibilities:
  *   1. Apply security headers to every response
@@ -186,7 +186,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  // 5. Authenticated user GÇö Onboarding Enforcement ------------------------------
+  // 5. Authenticated user â€” Onboarding Enforcement ------------------------------
   if (user && !isPublicRoute(pathname)) {
     const onboardingStatus = getCookieString(request, COOKIE_ONBOARDING_STATUS);
 
@@ -211,9 +211,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 6. Authenticated user GÇö Layer 1 RBAC: role-based route protection ----------
+  // 6. Authenticated user â€” Layer 1 RBAC: role-based route protection ----------
   //    Uses the cached role cookie for a fast, coarse-grained check.
-  //    If the cookie is missing, we allow through GÇö Layer 2 (API) or the
+  //    If the cookie is missing, we allow through â€” Layer 2 (API) or the
   //    page component's requireRole() will enforce with a fresh DB query.
   if (user) {
     const cachedRole = getCookieString(request, COOKIE_USER_ROLE) as UserRole | null;
@@ -244,7 +244,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 7. Authenticated user GÇö enforce session timeouts ----------------------------
+  // 7. Authenticated user â€” enforce session timeouts ----------------------------
   if (user) {
     const now = Date.now();
 
@@ -325,7 +325,7 @@ export async function middleware(request: NextRequest) {
 }
 
 // ---------------------------------------------------------------------------
-// Matcher GÇö run on every request except static assets
+// Matcher â€” run on every request except static assets
 // ---------------------------------------------------------------------------
 
 export const config = {
