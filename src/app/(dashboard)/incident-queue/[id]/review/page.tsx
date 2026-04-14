@@ -476,6 +476,9 @@ export default function DocumentReviewPage() {
         </Card>
       </div>
 
+        </div>
+      </div>
+
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-brand-slate-dark/95 backdrop-blur-sm lg:left-64">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
