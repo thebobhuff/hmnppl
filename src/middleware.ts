@@ -1,5 +1,5 @@
 /**
- * Next.js middleware â€” security headers + Supabase Auth session management.
+ * Next.js middleware GÇö security headers + Supabase Auth session management.
  *
  * Responsibilities:
  *   1. Apply security headers to every response
@@ -38,11 +38,11 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://*.supabase.co",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://login.microsoftonline.com https://static.cloudflareinsights.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://login.microsoftonline.com",
   ].join("; "),
 };
 
@@ -98,6 +98,7 @@ function getCookieNumber(request: NextRequest, name: string): number | null {
  */
 function getCookieString(request: NextRequest, name: string): string | null {
   return request.cookies.get(name)?.value ?? null;
+}
 
 /**
  * Sets a session-tracking cookie on the response with security attributes.
@@ -133,11 +134,7 @@ function applySecurityHeaders(response: NextResponse): void {
 // ---------------------------------------------------------------------------
 
 export async function middleware(request: NextRequest) {
-  }
-
   // 1. Create an initial response with security headers -------------------------
-  let response = NextResponse.next({ request });
-  applySecurityHeaders(response);
 
   // 2. Create Supabase server client that reads/writes cookies ------------------
   const supabase = createServerClient(
@@ -187,8 +184,9 @@ export async function middleware(request: NextRequest) {
     const redirectResponse = NextResponse.redirect(redirectUrl);
     applySecurityHeaders(redirectResponse);
     return redirectResponse;
+  }
 
-  // 5. Authenticated user â€” Onboarding Enforcement ------------------------------
+  // 5. Authenticated user GÇö Onboarding Enforcement ------------------------------
   if (user && !isPublicRoute(pathname)) {
     const onboardingStatus = getCookieString(request, COOKIE_ONBOARDING_STATUS);
 
@@ -210,10 +208,12 @@ export async function middleware(request: NextRequest) {
       const redirectResponse = NextResponse.redirect(redirectUrl);
       applySecurityHeaders(redirectResponse);
       return redirectResponse;
+    }
+  }
 
-  // 6. Authenticated user â€” Layer 1 RBAC: role-based route protection ----------
+  // 6. Authenticated user GÇö Layer 1 RBAC: role-based route protection ----------
   //    Uses the cached role cookie for a fast, coarse-grained check.
-  //    If the cookie is missing, we allow through â€” Layer 2 (API) or the
+  //    If the cookie is missing, we allow through GÇö Layer 2 (API) or the
   //    page component's requireRole() will enforce with a fresh DB query.
   if (user) {
     const cachedRole = getCookieString(request, COOKIE_USER_ROLE) as UserRole | null;
@@ -244,7 +244,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 7. Authenticated user â€” enforce session timeouts ----------------------------
+  // 7. Authenticated user GÇö enforce session timeouts ----------------------------
   if (user) {
     const now = Date.now();
 
@@ -322,9 +322,10 @@ export async function middleware(request: NextRequest) {
   }
 
   return response;
+}
 
 // ---------------------------------------------------------------------------
-// Matcher â€” run on every request except static assets
+// Matcher GÇö run on every request except static assets
 // ---------------------------------------------------------------------------
 
 export const config = {
