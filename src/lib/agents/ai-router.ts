@@ -6,7 +6,8 @@
  */
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+const DEFAULT_MODEL = "minimax/minimax-m2.5:free";
+const FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 2000;
 
@@ -44,6 +45,7 @@ function getApiKey(): string {
 
 function estimateCost(model: string, totalTokens: number): number {
   const pricing: Record<string, number> = {
+    "minimax/minimax-m2.5:free": 0,
     "nvidia/nemotron-3-super-120b-a12b:free": 0,
     "meta-llama/llama-3-8b-instruct": 0.0002,
     "meta-llama/llama-3-70b-instruct": 0.0008,
@@ -116,7 +118,46 @@ export async function callAI(options: AICallOptions): Promise<AIResponse> {
     }
   }
 
-  throw new Error("AI call failed after all retries");
+  // Try fallback model if primary failed
+    console.warn('[ai-router] Primary model failed, trying fallback:', FALLBACK_MODEL);
+    try {
+      const fbResponse = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://hmnppl.ai",
+          "X-Title": "HMN/PPL AI HR Platform",
+        },
+        body: JSON.stringify({
+          model: FALLBACK_MODEL,
+          messages: options.messages,
+          temperature: options.temperature ?? 0.1,
+          max_tokens: options.maxTokens ?? 2000,
+        }),
+      });
+      if (fbResponse.ok) {
+        const data = await fbResponse.json();
+        const choice = data.choices?.[0]?.message;
+        const usage = data.usage ?? {};
+        if (choice?.content) {
+          return {
+            content: choice.content,
+            usage: {
+              prompt_tokens: usage.prompt_tokens ?? 0,
+              completion_tokens: usage.completion_tokens ?? 0,
+              total_tokens: usage.total_tokens ?? 0,
+            },
+            cost: estimateCost(FALLBACK_MODEL, usage.total_tokens ?? 0),
+            model: FALLBACK_MODEL,
+            latency_ms: Date.now() - start,
+          };
+        }
+      }
+    } catch (fbErr) {
+      console.error('[ai-router] Fallback also failed:', fbErr);
+    }
+    throw new Error("AI call failed after all retries");
 }
 
 /** Parse JSON from AI response — handles markdown code blocks and other noise. */
