@@ -40,6 +40,7 @@ const COMPANY_ADMIN_NAV: NavItem[] = [
     iconName: "LayoutDashboard",
   },
   { key: "team", label: "Team", href: "/team", iconName: "Users" },
+  { key: "employees", label: "Employees", href: "/employees", iconName: "UserSearch" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
   {
     key: "settings",
@@ -51,6 +52,7 @@ const COMPANY_ADMIN_NAV: NavItem[] = [
 ];
 
 const HR_AGENT_NAV: NavItem[] = [
+  { key: "employees", label: "Employees", href: "/employees", iconName: "UserSearch" },
   {
     key: "dashboard",
     label: "Dashboard",
@@ -76,6 +78,8 @@ const MANAGER_NAV: NavItem[] = [
     href: "/dashboard",
     iconName: "LayoutDashboard",
   },
+  {
+    key: "my-team", label: "My Team", href: "/my-team", iconName: "Users" },
   {
     key: "report-issue",
     label: "Report Issue",
