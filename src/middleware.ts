@@ -134,6 +134,13 @@ function applySecurityHeaders(response: NextResponse): void {
 // ---------------------------------------------------------------------------
 
 export async function middleware(request: NextRequest) {
+  // TEMP: bypass for testing redirect loop
+  if (request.nextUrl.pathname === '/') {
+    const r = NextResponse.next();
+    applySecurityHeaders(r);
+    return r;
+  }
+
   // 1. Create an initial response with security headers -------------------------
   let response = NextResponse.next({ request });
   applySecurityHeaders(response);
