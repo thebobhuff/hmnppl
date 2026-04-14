@@ -135,6 +135,8 @@ function applySecurityHeaders(response: NextResponse): void {
 
 export async function middleware(request: NextRequest) {
   // 1. Create an initial response with security headers -------------------------
+  let response = NextResponse.next({ request });
+  applySecurityHeaders(response);
 
   // 2. Create Supabase server client that reads/writes cookies ------------------
   const supabase = createServerClient(
@@ -150,6 +152,10 @@ export async function middleware(request: NextRequest) {
           // handlers see the refreshed tokens.
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
 
+          // Create a fresh response so cookie mutations are applied, then
+          // re-apply security headers.
+          response = NextResponse.next({ request });
+          applySecurityHeaders(response);
 
           // Set auth cookies with strict security attributes.
           cookiesToSet.forEach(({ name, value, options }) => {
