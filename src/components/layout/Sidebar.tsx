@@ -14,6 +14,7 @@ import { useSidebarStore } from "@/stores/sidebar-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { getNavigationItems, getMobileNavItems } from "@/config/navigation";
+import { RoleSwitcher } from "@/components/navigation/RoleSwitcher";
 import { SidebarNavItem } from "@/components/navigation/SidebarNavItem";
 import type { Breakpoint } from "@/types";
 
