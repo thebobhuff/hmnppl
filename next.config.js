@@ -69,17 +69,6 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
   },
 
-  async redirects() {
-    return [
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "www.hmnppl.com" }],
-        destination: "https://hmnppl.com/:path*",
-        permanent: true,
-      },
-    ];
-  },
-
   async headers() {
     return [
       {
