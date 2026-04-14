@@ -6,7 +6,7 @@
  */
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "stepfun/step-3.5-flash:free";
+const DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 2000;
 
@@ -44,7 +44,7 @@ function getApiKey(): string {
 
 function estimateCost(model: string, totalTokens: number): number {
   const pricing: Record<string, number> = {
-    "stepfun/step-3.5-flash:free": 0,
+    "nvidia/nemotron-3-super-120b-a12b:free": 0,
     "meta-llama/llama-3-8b-instruct": 0.0002,
     "meta-llama/llama-3-70b-instruct": 0.0008,
     "openai/gpt-4o": 0.0025,
