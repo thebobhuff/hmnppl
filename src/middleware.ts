@@ -98,7 +98,6 @@ function getCookieNumber(request: NextRequest, name: string): number | null {
  */
 function getCookieString(request: NextRequest, name: string): string | null {
   return request.cookies.get(name)?.value ?? null;
-}
 
 /**
  * Sets a session-tracking cookie on the response with security attributes.
@@ -134,11 +133,6 @@ function applySecurityHeaders(response: NextResponse): void {
 // ---------------------------------------------------------------------------
 
 export async function middleware(request: NextRequest) {
-  // TEMP: bypass for testing redirect loop
-  if (request.nextUrl.pathname === '/') {
-    const r = NextResponse.next();
-    applySecurityHeaders(r);
-    return r;
   }
 
   // 1. Create an initial response with security headers -------------------------
@@ -159,10 +153,6 @@ export async function middleware(request: NextRequest) {
           // handlers see the refreshed tokens.
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
 
-          // Create a fresh response so cookie mutations are applied, then
-          // re-apply security headers.
-          response = NextResponse.next({ request });
-          applySecurityHeaders(response);
 
           // Set auth cookies with strict security attributes.
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -197,7 +187,6 @@ export async function middleware(request: NextRequest) {
     const redirectResponse = NextResponse.redirect(redirectUrl);
     applySecurityHeaders(redirectResponse);
     return redirectResponse;
-  }
 
   // 5. Authenticated user — Onboarding Enforcement ------------------------------
   if (user && !isPublicRoute(pathname)) {
@@ -221,8 +210,6 @@ export async function middleware(request: NextRequest) {
       const redirectResponse = NextResponse.redirect(redirectUrl);
       applySecurityHeaders(redirectResponse);
       return redirectResponse;
-    }
-  }
 
   // 6. Authenticated user — Layer 1 RBAC: role-based route protection ----------
   //    Uses the cached role cookie for a fast, coarse-grained check.
@@ -335,7 +322,6 @@ export async function middleware(request: NextRequest) {
   }
 
   return response;
-}
 
 // ---------------------------------------------------------------------------
 // Matcher — run on every request except static assets
