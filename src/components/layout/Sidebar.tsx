@@ -190,6 +190,7 @@ function DesktopSidebar({
         </ul>
       </nav>
 
+      <RoleSwitcher />
       {/* Collapse Toggle — desktop only */}
       {isDesktop && (
         <div className="border-t border-border p-3">
