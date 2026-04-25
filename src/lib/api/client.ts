@@ -438,6 +438,15 @@ export interface IncidentResponse {
   id: string;
   company_id: string;
   employee_id: string;
+  employee?: {
+    id?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    job_title?: string | null;
+    department_id?: string | null;
+    department?: { name?: string | null } | null;
+  };
   reported_by: string;
   reference_number: string;
   type: string;
@@ -455,6 +464,9 @@ export interface IncidentResponse {
   policy_version: number | null;
   previous_incident_count: number;
   escalation_level: number | null;
+  action_type?: string | null;
+  department?: string | null;
+  disciplinary_action?: { id: string; action_type: string; status: string } | null;
   created_at: string;
   updated_at: string;
   witnesses: string[];

@@ -11,42 +11,24 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { meetingsAPI, type MeetingResponse } from "@/lib/api/client";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Calendar,
   Clock,
-  Users,
   Link2,
   Video,
-  FileText,
-  CheckCircle,
-  XCircle,
   Edit3,
 } from "lucide-react";
 import Link from "next/link";
-
-interface MeetingDetail {
-  id: string;
-  title: string;
-  type: string;
-  date: string;
-  time: string;
-  duration: number;
-  participants: string[];
-  status: "scheduled" | "completed" | "cancelled";
-  meetingLink?: string;
-  agenda: string;
-  summary?: string;
-  notes?: string;
-}
 
 export default function MeetingDetailPage() {
   const params = useParams();
   const id = params?.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
+  const [meeting, setMeeting] = useState<MeetingResponse | null>(null);
 
   usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
@@ -55,21 +37,22 @@ export default function MeetingDetailPage() {
   ]);
 
   useEffect(() => {
-    setTimeout(() => {
-      setMeeting({
-        id: id || "1",
-        title: "Disciplinary Review — J. Smith",
-        type: "Written Warning",
-        date: "2026-04-05",
-        time: "2:00 PM",
-        duration: 30,
-        participants: ["Maria Garcia", "David Park", "John Smith"],
-        status: "scheduled",
-        meetingLink: "https://zoom.us/j/123456789",
-        agenda: "Review attendance policy violation, discuss corrective actions.",
-      });
-      setLoading(false);
-    }, 300);
+    let active = true;
+    async function loadMeeting() {
+      try {
+        const res = await meetingsAPI.get(id);
+        if (active) setMeeting(res.meeting);
+      } catch (error) {
+        console.error("Failed to load meeting", error);
+        if (active) setMeeting(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    if (id) loadMeeting();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   if (loading) {
@@ -92,7 +75,7 @@ export default function MeetingDetailPage() {
             Meeting Not Found
           </h2>
           <p className="mt-2 text-text-secondary">
-            The meeting you're looking for doesn't exist.
+            The requested meeting does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/meetings">Back to Meetings</Link>
@@ -104,8 +87,8 @@ export default function MeetingDetailPage() {
 
   return (
     <PageContainer
-      title={meeting.title}
-      description={`${meeting.type} • ${meeting.date} at ${meeting.time}`}
+      title={`${formatLabel(meeting.type)} Meeting`}
+      description={`${formatLabel(meeting.type)} • ${formatDateTime(meeting.scheduled_at)}`}
     >
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -122,20 +105,20 @@ export default function MeetingDetailPage() {
             <Card className="p-6">
               <div className="mb-4 flex items-center justify-between">
                 <Badge variant={meeting.status === "scheduled" ? "warning" : "success"}>
-                  {meeting.status}
+                  {formatLabel(meeting.status)}
                 </Badge>
-                <Badge variant="default">{meeting.type}</Badge>
+                <Badge variant="default">{formatLabel(meeting.type)}</Badge>
               </div>
 
               <h3 className="mb-2 text-lg font-semibold text-text-primary">Agenda</h3>
-              <p className="text-text-secondary">{meeting.agenda}</p>
+              <p className="text-text-secondary">{meeting.agenda ?? "No agenda recorded."}</p>
 
-              {meeting.summary && (
+              {(meeting.ai_summary || meeting.notes || meeting.outcome) && (
                 <>
                   <h3 className="mb-2 mt-6 text-lg font-semibold text-text-primary">
                     Summary
                   </h3>
-                  <p className="text-text-secondary">{meeting.summary}</p>
+                  <p className="text-text-secondary">{formatSummary(meeting)}</p>
                 </>
               )}
             </Card>
@@ -144,10 +127,10 @@ export default function MeetingDetailPage() {
               <Card className="p-6">
                 <h3 className="mb-4 text-lg font-semibold text-text-primary">Actions</h3>
                 <div className="flex gap-3">
-                  {meeting.meetingLink && (
+                  {meeting.meeting_link && (
                     <Button asChild>
                       <a
-                        href={meeting.meetingLink}
+                        href={meeting.meeting_link}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -172,17 +155,17 @@ export default function MeetingDetailPage() {
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Date:</span>
-                  <span className="text-text-primary">{meeting.date}</span>
+                  <span className="text-text-primary">{formatDate(meeting.scheduled_at)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Time:</span>
-                  <span className="text-text-primary">{meeting.time}</span>
+                  <span className="text-text-primary">{formatTime(meeting.scheduled_at)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Duration:</span>
-                  <span className="text-text-primary">{meeting.duration} min</span>
+                  <span className="text-text-primary">{meeting.duration_minutes ?? 30} min</span>
                 </div>
               </div>
             </Card>
@@ -190,27 +173,30 @@ export default function MeetingDetailPage() {
             <Card className="p-4">
               <h3 className="mb-3 font-medium text-text-primary">Participants</h3>
               <div className="space-y-2">
-                {meeting.participants.map((participant, i) => (
+                {(meeting.participants ?? []).map((participant, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-slate-light">
                       <span className="text-xs font-medium text-text-primary">
-                        {participant
+                        {participant.role
                           .split(" ")
                           .map((n) => n[0])
                           .join("")}
                       </span>
                     </div>
-                    <span className="text-sm text-text-primary">{participant}</span>
+                    <span className="text-sm text-text-primary">{formatLabel(participant.role)}</span>
                   </div>
                 ))}
+                {!meeting.participants?.length && (
+                  <p className="text-sm text-text-tertiary">No participants listed.</p>
+                )}
               </div>
             </Card>
 
-            {meeting.meetingLink && (
+            {meeting.meeting_link && (
               <Card className="p-4">
                 <h3 className="mb-3 font-medium text-text-primary">Meeting Link</h3>
                 <a
-                  href={meeting.meetingLink}
+                  href={meeting.meeting_link}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-sm text-brand-primary hover:underline"
@@ -225,4 +211,32 @@ export default function MeetingDetailPage() {
       </div>
     </PageContainer>
   );
+}
+
+function formatLabel(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "Not scheduled";
+  return new Date(value).toLocaleDateString();
+}
+
+function formatTime(value: string | null) {
+  if (!value) return "Time TBD";
+  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "Not scheduled";
+  return new Date(value).toLocaleString();
+}
+
+function formatSummary(meeting: MeetingResponse) {
+  if (meeting.outcome) return meeting.outcome;
+  if (meeting.notes) return meeting.notes;
+  if (meeting.ai_summary?.summary && typeof meeting.ai_summary.summary === "string") {
+    return meeting.ai_summary.summary;
+  }
+  return "Summary captured.";
 }

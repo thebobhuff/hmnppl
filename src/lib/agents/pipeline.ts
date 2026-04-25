@@ -80,9 +80,48 @@ const HIGH_RISK_TYPES = new Set([
   "violence",
   "harassment",
   "financial_impropriety",
+  "protected_class_concern",
   "theft",
-  "misconduct",
 ]);
+
+const PROTECTED_CLASS_PATTERNS = [
+  /\bage\b/i,
+  /\brace\b/i,
+  /\bgender\b/i,
+  /\breligion\b/i,
+  /\bdisab(?:ility|led)\b/i,
+  /\bnational origin\b/i,
+  /\bsexual orientation\b/i,
+  /\bpregnan(?:cy|t)\b/i,
+  /\bmarital status\b/i,
+  /\bveteran\b/i,
+];
+
+function containsProtectedClassLanguage(text: string): boolean {
+  return PROTECTED_CLASS_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function sanitizeForAI(text: string): string {
+  return PROTECTED_CLASS_PATTERNS.reduce(
+    (sanitized, pattern) => sanitized.replace(pattern, "[protected class reference removed]"),
+    text,
+  );
+}
+
+function requiresHumanReview(escalationLevel: string): boolean {
+  return escalationLevel !== "verbal_warning";
+}
+
+function incidentStatusFor(result: PipelineResult): string {
+  if (result.bypassesAgent) return "pending_hr_review";
+  return result.requiresHRReview ? "pending_hr_review" : "ai_evaluated";
+}
+
+function riskFactorsFrom(reason?: string, aiFactors?: string[]): string[] {
+  const factors = aiFactors?.filter(Boolean) ?? [];
+  if (reason) factors.unshift(reason);
+  return [...new Set(factors)];
+}
 
 // ============================================================================
 // Pipeline
@@ -103,11 +142,16 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
   let riskLevel = input.severity;
   let bypassesAgent = false;
   let bypassReason: string | undefined;
+  const sanitizedDescription = sanitizeForAI(input.description);
 
   if (HIGH_RISK_TYPES.has(input.incidentType)) {
     riskLevel = "critical";
     bypassesAgent = true;
     bypassReason = `High-risk incident type '${input.incidentType}' requires immediate HR review`;
+  } else if (containsProtectedClassLanguage(input.description)) {
+    riskLevel = "critical";
+    bypassesAgent = true;
+    bypassReason = "Potential protected-class language detected. Route directly to HR before agent processing.";
   }
   trackStep("pre_check", step0Start, 0);
 
@@ -127,7 +171,7 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
         action: "immediate_hr_escalation",
         reason: bypassReason,
       },
-      riskFactors: [bypassReason],
+      riskFactors: riskFactorsFrom(bypassReason),
       coachingTopics: [],
       trainingGaps: [],
       totalCost,
@@ -145,7 +189,7 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
   try {
     const riskMessages = buildRiskClassifierPrompt({
       incidentType: input.incidentType,
-      description: input.description,
+      description: sanitizedDescription,
       severity: input.severity,
       employeeRole: input.employeeTitle,
       department: input.department,
@@ -158,6 +202,40 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
     trackStep("risk_classifier", step1Start, riskResponse.cost);
   } catch (err) {
     trackStep("risk_classifier", step1Start, 0, String(err));
+  }
+
+  if (bypassesAgent) {
+    const result: PipelineResult = {
+      success: true,
+      riskLevel,
+      bypassesAgent: true,
+      bypassReason,
+      similarityVerdict: "skipped",
+      escalationLevel: "immediate_hr_escalation",
+      requiresHRReview: true,
+      generatedDocument: "",
+      aiConfidence: (riskResult.confidence as number) ?? 0.9,
+      aiRecommendation: {
+        action: "immediate_hr_escalation",
+        reason: bypassReason,
+        risk_factors: riskFactorsFrom(
+          bypassReason,
+          riskResult.risk_factors as string[] | undefined,
+        ),
+      },
+      riskFactors: riskFactorsFrom(
+        bypassReason,
+        riskResult.risk_factors as string[] | undefined,
+      ),
+      coachingTopics: [],
+      trainingGaps: [],
+      totalCost,
+      totalLatencyMs: Date.now() - pipelineStart,
+      steps,
+    };
+
+    await updateIncidentInDB(input.incidentId, result);
+    return result;
   }
 
   // ── Step 2: Issue Similarity ──────────────────────────────────────────
@@ -187,7 +265,7 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
 
       const simMessages = buildIssueSimilarityPrompt({
         newIncidentType: input.incidentType,
-        newIncidentDescription: input.description,
+        newIncidentDescription: sanitizedDescription,
         previousIncidents,
       });
       const simResponse = await callAI({ messages: simMessages, temperature: 0.1, maxTokens: 600 });
@@ -204,7 +282,7 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
   // ── Step 3: Escalation Routing ────────────────────────────────────────
   const step3Start = Date.now();
   let escalationLevel = "verbal_warning";
-  let requiresHRReview = true;
+  let requiresHRReview = false;
   let coachingTopics: string[] = [];
   let trainingGaps: string[] = [];
   let matchedPolicyId: string | undefined;
@@ -240,7 +318,7 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
   try {
     const escMessages = buildEscalationRouterPrompt({
       incidentType: input.incidentType,
-      description: input.description,
+      description: sanitizedDescription,
       severity: input.severity,
       previousIncidentCount: input.previousIncidentCount,
       previousIncidents: previousIncidents as any,
@@ -249,12 +327,46 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
     const escResponse = await callAI({ messages: escMessages, temperature: 0.1, maxTokens: 1000 });
     const escResult = parseAIJSON(escResponse.content);
     escalationLevel = (escResult.escalation_level as string) ?? "verbal_warning";
-    requiresHRReview = (escResult.requires_hr_review as boolean) ?? true;
+    requiresHRReview = requiresHumanReview(escalationLevel);
     coachingTopics = (escResult.coaching_topics as string[]) ?? [];
     trainingGaps = (escResult.training_gaps as string[]) ?? [];
     trackStep("escalation_router", step3Start, escResponse.cost);
   } catch (err) {
     trackStep("escalation_router", step3Start, 0, String(err));
+  }
+
+  if (escalationLevel === "immediate_hr_escalation") {
+    const result: PipelineResult = {
+      success: true,
+      riskLevel: "critical",
+      bypassesAgent: true,
+      bypassReason: "Escalation router determined this incident must bypass the agent loop.",
+      similarityVerdict,
+      escalationLevel,
+      requiresHRReview: true,
+      generatedDocument: "",
+      aiConfidence: 0.9,
+      aiRecommendation: {
+        action: escalationLevel,
+        reason: "Escalation router determined this incident must bypass the agent loop.",
+        risk_factors: riskFactorsFrom(
+          "Escalation router determined this incident must bypass the agent loop.",
+          riskResult.risk_factors as string[] | undefined,
+        ),
+      },
+      riskFactors: riskFactorsFrom(
+        "Escalation router determined this incident must bypass the agent loop.",
+        riskResult.risk_factors as string[] | undefined,
+      ),
+      coachingTopics: [],
+      trainingGaps,
+      totalCost,
+      totalLatencyMs: Date.now() - pipelineStart,
+      steps,
+    };
+
+    await updateIncidentInDB(input.incidentId, result);
+    return result;
   }
 
   // ── Step 4: Document Generation ───────────────────────────────────────
@@ -264,7 +376,7 @@ export async function runAIPipeline(input: PipelineInput): Promise<PipelineResul
   try {
     const docMessages = buildDocumentGeneratorPrompt({
       incidentType: input.incidentType,
-      description: input.description,
+      description: sanitizedDescription,
       severity: input.severity,
       escalationLevel,
       employeeName: input.employeeName ?? "Employee",
@@ -349,7 +461,7 @@ async function updateIncidentInDB(incidentId: string, result: PipelineResult) {
       ai_evaluation_status: result.success ? "completed" : "failed",
       ai_recommendation: result.aiRecommendation,
       escalation_level: escalationToNumber(result.escalationLevel),
-      status: result.bypassesAgent ? "pending_hr_review" : "pending_hr_review",
+      status: incidentStatusFor(result),
     };
 
     if (result.linkedPolicyId) {
@@ -379,7 +491,7 @@ async function updateIncidentInDB(incidentId: string, result: PipelineResult) {
           company_id: incident.company_id,
           employee_id: incident.employee_id,
           action_type: result.escalationLevel,
-          status: "pending_signature",
+          status: result.requiresHRReview ? "pending_approval" : "approved",
           follow_up_actions: result.aiRecommendation?.coaching_topics ?? [],
           document_content: result.generatedDocument,
         }, { onConflict: "incident_id" });

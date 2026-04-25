@@ -18,7 +18,7 @@ export function AiPerformanceCharts({ accuracyData, confidenceData, volumeData }
       <Card className="col-span-2 md:col-span-1">
         <CardHeader>
           <CardTitle>AI Acceptance vs Override Rate</CardTitle>
-          <CardSubtitle>How often HR accepted vs rejected the AI's proposal</CardSubtitle>
+          <CardSubtitle>How often HR accepted vs rejected the AI proposal</CardSubtitle>
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">

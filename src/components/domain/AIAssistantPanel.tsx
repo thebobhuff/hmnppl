@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   MessageCircle,
@@ -406,7 +407,7 @@ export function AIAssistantPanel({ isOpen, onClose }: PanelProps) {
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs text-text-tertiary">Draft Policy</p>
               <Button variant="outline" size="sm" asChild>
-                <a href="/policies/new">Open Builder</a>
+                <Link href="/policies/new">Open Builder</Link>
               </Button>
             </div>
             <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-brand-slate-light p-3 text-xs">

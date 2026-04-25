@@ -132,7 +132,9 @@ export async function POST(request: Request) {
     password,
   });
 
-  let authenticatedUser = authData.user;
+  let authenticatedUser: { id: string } | null = authData.user
+    ? { id: authData.user.id }
+    : null;
 
   if (authError) {
     const isDevCaptchaFailure =
@@ -153,12 +155,19 @@ export async function POST(request: Request) {
       if (sessionError) {
         throw new Error(sessionError.message);
       }
+      if (!fallbackSession.user) {
+        throw new Error("Fallback session did not return a user");
+      }
 
-      authenticatedUser = fallbackSession.user;
+      authenticatedUser = { id: fallbackSession.user.id };
     } catch (fallbackError) {
       console.error("[login] Dev fallback failed:", fallbackError);
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
+  }
+
+  if (!authenticatedUser) {
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   // --- Fetch user profile (use admin client to guarantee access) ---

@@ -11,27 +11,17 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { policiesAPI, type PolicyResponse } from "@/lib/api/client";
 import { useParams } from "next/navigation";
 import { ArrowLeft, FileText, Shield, Calendar, Edit3 } from "lucide-react";
 import Link from "next/link";
-
-interface PolicyDetail {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
-  version: number;
-  is_active: boolean;
-  created_at: string;
-  rules: number;
-}
 
 export default function PolicyDetailPage() {
   const params = useParams();
   const id = params?.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [policy, setPolicy] = useState<PolicyDetail | null>(null);
+  const [policy, setPolicy] = useState<PolicyResponse | null>(null);
 
   usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
@@ -40,33 +30,22 @@ export default function PolicyDetailPage() {
   ]);
 
   useEffect(() => {
-    setTimeout(() => {
-      setPolicy({
-        id: id || "1",
-        title: "Attendance & Punctuality Policy",
-        category: "attendance",
-        content: `SECTION 3.2 — REPEATED TARDINESS
-
-Three or more unexcused late arrivals within a 30-day period shall result in progressive disciplinary action:
-
-1. First Occurrence: Verbal warning
-2. Second Occurrence: Written warning
-3. Third Occurrence: Performance Improvement Plan (PIP)
-4. Fourth Occurrence: Termination review
-
-DEFINITIONS:
-- "Late arrival" means arriving more than 10 minutes after scheduled start time without prior approval.
-- "Unexcused" means without supervisor approval or documented emergency.
-
-NOTIFICATION:
-Employees must notify their supervisor at least 1 hour before scheduled start time if unable to arrive on time.`,
-        version: 2,
-        is_active: true,
-        created_at: "2026-01-15T10:00:00Z",
-        rules: 4,
-      });
-      setLoading(false);
-    }, 300);
+    let active = true;
+    async function loadPolicy() {
+      try {
+        const res = await policiesAPI.get(id);
+        if (active) setPolicy(res.policy);
+      } catch (error) {
+        console.error("Failed to load policy", error);
+        if (active) setPolicy(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    if (id) loadPolicy();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   if (loading) {
@@ -89,7 +68,7 @@ Employees must notify their supervisor at least 1 hour before scheduled start ti
             Policy Not Found
           </h2>
           <p className="mt-2 text-text-secondary">
-            The policy you're looking for doesn't exist.
+            The requested policy does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/policies">Back to Policies</Link>
@@ -152,7 +131,7 @@ Employees must notify their supervisor at least 1 hour before scheduled start ti
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Rules:</span>
-                  <span className="text-text-primary">{policy.rules}</span>
+                  <span className="text-text-primary">{policy.rules.length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-text-tertiary" />

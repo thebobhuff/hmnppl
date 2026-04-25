@@ -97,6 +97,36 @@ const ISSUE_TYPES = [
     description: "Breach of company policy",
   },
   {
+    id: "safety_violation",
+    label: "Safety",
+    icon: AlertTriangle,
+    description: "Workplace safety risk",
+  },
+  {
+    id: "violence",
+    label: "Violence",
+    icon: AlertTriangle,
+    description: "Threats or physical harm",
+  },
+  {
+    id: "harassment",
+    label: "Harassment",
+    icon: AlertTriangle,
+    description: "Harassment or protected-class concern",
+  },
+  {
+    id: "financial_impropriety",
+    label: "Financial",
+    icon: AlertTriangle,
+    description: "Fraud, theft, embezzlement",
+  },
+  {
+    id: "protected_class_concern",
+    label: "Protected Class",
+    icon: AlertTriangle,
+    description: "Potential protected-class issue",
+  },
+  {
     id: "theft",
     label: "Theft",
     icon: AlertTriangle,

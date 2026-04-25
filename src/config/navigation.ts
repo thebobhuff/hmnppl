@@ -42,6 +42,13 @@ const COMPANY_ADMIN_NAV: NavItem[] = [
   { key: "team", label: "Team", href: "/team", iconName: "Users" },
   { key: "employees", label: "Employees", href: "/employees", iconName: "Search" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
+  { key: "org-health", label: "Org Health", href: "/org-health", iconName: "Activity" },
+  {
+    key: "training-gaps",
+    label: "Training Gaps",
+    href: "/training-gaps",
+    iconName: "GraduationCap",
+  },
   {
     key: "settings",
     label: "Settings",
@@ -68,6 +75,13 @@ const HR_AGENT_NAV: NavItem[] = [
   },
   { key: "meetings", label: "Meetings", href: "/meetings", iconName: "Calendar" },
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
+  { key: "org-health", label: "Org Health", href: "/org-health", iconName: "Activity" },
+  {
+    key: "training-gaps",
+    label: "Training Gaps",
+    href: "/training-gaps",
+    iconName: "GraduationCap",
+  },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
 ];
 
@@ -86,6 +100,12 @@ const MANAGER_NAV: NavItem[] = [
     href: "/report-issue",
     iconName: "PlusCircle",
     isCta: true,
+  },
+  {
+    key: "conduct-interview",
+    label: "Coach Interview",
+    href: "/conduct-interview",
+    iconName: "MessagesSquare",
   },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
 ];
