@@ -81,7 +81,7 @@ export default async function AiPerformancePage() {
     <PageContainer title="AI Performance & Analytics">
       <div className="space-y-6">
         <p className="text-muted-foreground text-sm">
-          Analytics tracking the autonomous HR agent's performance, evaluation volume, and human-in-the-loop override rates.
+          Analytics tracking autonomous HR agent performance, evaluation volume, and human-in-the-loop override rates.
         </p>
         <AiPerformanceCharts 
           accuracyData={accuracyData.length > 0 ? accuracyData : [{ name: "No Data", value: 1 }]} 

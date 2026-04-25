@@ -15,7 +15,16 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileText, CheckCircle, Clock, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { disciplinaryAPI } from "@/lib/api/client";
+
+interface EmployeeDocument {
+  id: string;
+  title: string;
+  type: string;
+  status: "pending_signature" | "signed" | "disputed";
+  reference: string;
+  createdAt: string;
+  signedAt: string | null;
+}
 
 export default function EmployeeDocumentsPage() {
   const breadcrumbs = usePageBreadcrumbs([
@@ -23,17 +32,17 @@ export default function EmployeeDocumentsPage() {
     { label: "My Documents" },
   ]);
 
-  const [docs, setDocs] = useState<any[]>([]);
+  const [docs, setDocs] = useState<EmployeeDocument[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     async function loadDocs() {
       try {
-        const res = await disciplinaryAPI.list(undefined, undefined, 50);
-        if (active && res.actions) {
-          setDocs(res.actions);
-        }
+        const res = await fetch("/api/v1/users/me/documents");
+        if (!res.ok) throw new Error(`Failed with status ${res.status}`);
+        const json = (await res.json()) as { documents: EmployeeDocument[] };
+        if (active) setDocs(json.documents);
       } catch (err) {
         console.error("Failed to load documents", err);
       } finally {
@@ -49,7 +58,7 @@ export default function EmployeeDocumentsPage() {
     [docs],
   );
   const signedDocs = useMemo(
-    () => docs.filter((d) => d.status === "completed" || d.status === "signed"),
+    () => docs.filter((d) => d.status === "signed"),
     [docs],
   );
   const disputedDocs = useMemo(
@@ -137,7 +146,7 @@ function DocumentCard({
   isSigned,
   isDisputed,
 }: {
-  doc: any;
+  doc: EmployeeDocument;
   isSigned?: boolean;
   isDisputed?: boolean;
 }) {
@@ -145,9 +154,9 @@ function DocumentCard({
     <Card className="p-4 transition-colors hover:bg-card-hover">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-sm font-medium text-text-primary">{doc.action_type || "Document"}</h3>
+          <h3 className="text-sm font-medium text-text-primary">{doc.title}</h3>
           <p className="mt-0.5 text-xs text-text-tertiary">
-            {doc.incident_id ? "INC-" + doc.incident_id.slice(0, 4) : "Unreferenced"}
+            {doc.reference} • {doc.type}
           </p>
         </div>
         {!isSigned && !isDisputed ? (
@@ -163,7 +172,7 @@ function DocumentCard({
         {isSigned ? (
           <span className="flex items-center gap-1 text-brand-success">
             <CheckCircle className="h-3 w-3" />
-            Completed: {new Date(doc.updated_at).toLocaleDateString()}
+            Completed: {doc.signedAt ? new Date(doc.signedAt).toLocaleDateString() : "Signed"}
           </span>
         ) : isDisputed ? (
           <span className="flex items-center gap-1 text-brand-error">
@@ -173,14 +182,14 @@ function DocumentCard({
         ) : (
           <span className="flex items-center gap-1 text-brand-warning">
             <Clock className="h-3 w-3" />
-            Created: {new Date(doc.created_at).toLocaleDateString()}
+            Created: {new Date(doc.createdAt).toLocaleDateString()}
           </span>
         )}
       </div>
 
       <div className="mt-4 flex gap-2">
         <Button asChild size="sm" variant={isSigned || isDisputed ? "outline" : "default"}>
-          <Link href={"/documents/\/view"}>
+          <Link href={`/documents/${doc.id}/sign`}>
             {isSigned || isDisputed ? "View Details" : "Sign Document"}
             {(!isSigned && !isDisputed) && <ArrowRight className="ml-2 h-4 w-4" />}
           </Link>

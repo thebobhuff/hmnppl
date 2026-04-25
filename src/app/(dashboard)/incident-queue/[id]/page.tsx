@@ -11,7 +11,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useParams, useRouter } from "next/navigation";
+import { incidentsAPI, type IncidentDetail } from "@/lib/api/client";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   FileText,
@@ -19,29 +20,12 @@ import {
   Calendar,
   AlertTriangle,
   Clock,
-  CheckCircle,
-  MessageSquare,
   Shield,
 } from "lucide-react";
 import Link from "next/link";
 
-interface IncidentDetail {
-  id: string;
-  reference_number: string;
-  type: string;
-  severity: string;
-  status: string;
-  description: string;
-  employee_id: string;
-  reported_by: string;
-  incident_date: string;
-  created_at: string;
-  ai_confidence_score: number;
-}
-
 export default function IncidentDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -54,24 +38,22 @@ export default function IncidentDetailPage() {
   ]);
 
   useEffect(() => {
-    // Mock data
-    setTimeout(() => {
-      setIncident({
-        id: id || "1",
-        reference_number: "INC-2026-0001",
-        type: "tardiness",
-        severity: "medium",
-        status: "pending_hr_review",
-        description:
-          "Employee arrived 45 minutes late without prior notification. This is the second occurrence this month.",
-        employee_id: "Alice Johnson",
-        reported_by: "Bob Smith",
-        incident_date: "2026-04-07",
-        created_at: "2026-04-07T10:30:00Z",
-        ai_confidence_score: 0.87,
-      });
-      setLoading(false);
-    }, 300);
+    let active = true;
+    async function loadIncident() {
+      try {
+        const res = await incidentsAPI.get(id);
+        if (active) setIncident(res.incident);
+      } catch (error) {
+        console.error("Failed to load incident", error);
+        if (active) setIncident(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    if (id) loadIncident();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   if (loading) {
@@ -94,7 +76,7 @@ export default function IncidentDetailPage() {
             Incident Not Found
           </h2>
           <p className="mt-2 text-text-secondary">
-            The incident you're looking for doesn't exist.
+            The requested incident does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/incident-queue">Back to Queue</Link>
@@ -110,6 +92,13 @@ export default function IncidentDetailPage() {
     high: "border-l-brand-error",
     critical: "border-l-brand-error-dim",
   };
+  const confidence = incident.ai_confidence_score ?? 0;
+  const employeeName = incident.employee
+    ? `${incident.employee.first_name ?? ""} ${incident.employee.last_name ?? ""}`.trim()
+    : incident.employee_id;
+  const reporterName = incident.reporter
+    ? `${incident.reporter.first_name} ${incident.reporter.last_name}`.trim()
+    : incident.reported_by;
 
   return (
     <PageContainer
@@ -179,13 +168,13 @@ export default function IncidentDetailPage() {
                   <div className="mb-1 flex justify-between text-sm">
                     <span className="text-text-tertiary">Confidence Score</span>
                     <span className="font-medium text-text-primary">
-                      {Math.round(incident.ai_confidence_score * 100)}%
+                      {Math.round(confidence * 100)}%
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-brand-slate-light">
                     <div
                       className="h-full rounded-full bg-brand-primary"
-                      style={{ width: `${incident.ai_confidence_score * 100}%` }}
+                      style={{ width: `${confidence * 100}%` }}
                     />
                   </div>
                 </div>
@@ -200,12 +189,12 @@ export default function IncidentDetailPage() {
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Employee:</span>
-                  <span className="text-text-primary">{incident.employee_id}</span>
+                  <span className="text-text-primary">{employeeName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Reported by:</span>
-                  <span className="text-text-primary">{incident.reported_by}</span>
+                  <span className="text-text-primary">{reporterName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-text-tertiary" />

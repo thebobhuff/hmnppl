@@ -14,27 +14,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Save, FileText, Shield } from "lucide-react";
+import { policiesAPI, type PolicyResponse } from "@/lib/api/client";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Save, FileText } from "lucide-react";
 import Link from "next/link";
-
-interface PolicyDetail {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
-  version: number;
-  is_active: boolean;
-  created_at: string;
-}
 
 export default function EditPolicyPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [policy, setPolicy] = useState<PolicyDetail | null>(null);
+  const [policy, setPolicy] = useState<PolicyResponse | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     category: "",
@@ -48,37 +40,22 @@ export default function EditPolicyPage() {
   ]);
 
   useEffect(() => {
-    setTimeout(() => {
-      setPolicy({
-        id: id || "1",
-        title: "Attendance & Punctuality Policy",
-        category: "attendance",
-        content: `SECTION 3.2 — REPEATED TARDINESS
-
-Three or more unexcused late arrivals within a 30-day period shall result in progressive disciplinary action:
-
-1. First Occurrence: Verbal warning
-2. Second Occurrence: Written warning
-3. Third Occurrence: Performance Improvement Plan (PIP)
-4. Fourth Occurrence: Termination review
-
-DEFINITIONS:
-- "Late arrival" means arriving more than 10 minutes after scheduled start time without prior approval.
-- "Unexcused" means without supervisor approval or documented emergency.
-
-NOTIFICATION:
-Employees must notify their supervisor at least 1 hour before scheduled start time if unable to arrive on time.`,
-        version: 2,
-        is_active: true,
-        created_at: "2026-01-15T10:00:00Z",
-      });
-      setFormData({
-        title: "Attendance & Punctuality Policy",
-        category: "attendance",
-        content: policy?.content || "",
-      });
-      setLoading(false);
-    }, 300);
+    let active = true;
+    async function loadPolicy() {
+      try {
+        const res = await policiesAPI.get(id);
+        if (active) setPolicy(res.policy);
+      } catch (error) {
+        console.error("Failed to load policy", error);
+        if (active) setPolicy(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    if (id) loadPolicy();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -92,9 +69,21 @@ Employees must notify their supervisor at least 1 hour before scheduled start ti
   }, [policy]);
 
   const handleSave = async () => {
+    if (!policy) return;
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setSaving(false);
+    try {
+      await policiesAPI.update(policy.id, {
+        ...policy,
+        title: formData.title,
+        category: formData.category,
+        content: formData.content,
+      });
+      router.push(`/policies/${policy.id}`);
+    } catch (error) {
+      console.error("Failed to save policy", error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const categoryOptions = [
@@ -126,7 +115,7 @@ Employees must notify their supervisor at least 1 hour before scheduled start ti
             Policy Not Found
           </h2>
           <p className="mt-2 text-text-secondary">
-            The policy you're looking for doesn't exist.
+            The requested policy does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/policies">Back to Policies</Link>
