@@ -16,37 +16,21 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  Users,
   Link2,
   Video,
-  FileText,
-  CheckCircle,
-  XCircle,
   Edit3,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
-
-interface MeetingDetail {
-  id: string;
-  title: string;
-  type: string;
-  date: string;
-  time: string;
-  duration: number;
-  participants: string[];
-  status: "scheduled" | "completed" | "cancelled";
-  meetingLink?: string;
-  agenda: string;
-  summary?: string;
-  notes?: string;
-}
+import { meetingsAPI } from "@/lib/api/client";
 
 export default function MeetingDetailPage() {
   const params = useParams();
-  const id = params?.id as string;
+  const id = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
+  const [meeting, setMeeting] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
@@ -55,21 +39,21 @@ export default function MeetingDetailPage() {
   ]);
 
   useEffect(() => {
-    setTimeout(() => {
-      setMeeting({
-        id: id || "1",
-        title: "Disciplinary Review — J. Smith",
-        type: "Written Warning",
-        date: "2026-04-05",
-        time: "2:00 PM",
-        duration: 30,
-        participants: ["Maria Garcia", "David Park", "John Smith"],
-        status: "scheduled",
-        meetingLink: "https://zoom.us/j/123456789",
-        agenda: "Review attendance policy violation, discuss corrective actions.",
-      });
-      setLoading(false);
-    }, 300);
+    let active = true;
+    async function loadMeeting() {
+      try {
+        const res = await meetingsAPI.get(id);
+        if (active && res.meeting) {
+          setMeeting(res.meeting);
+        }
+      } catch (err) {
+        if (active) setError("Failed to load meeting");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadMeeting();
+    return () => { active = false; };
   }, [id]);
 
   if (loading) {
@@ -83,16 +67,16 @@ export default function MeetingDetailPage() {
     );
   }
 
-  if (!meeting) {
+  if (error || !meeting) {
     return (
       <PageContainer title="Meeting Not Found">
         <Card className="p-8 text-center">
           <Calendar className="mx-auto h-12 w-12 text-brand-warning" />
           <h2 className="mt-4 text-lg font-semibold text-text-primary">
-            Meeting Not Found
+            {error || "Meeting Not Found"}
           </h2>
           <p className="mt-2 text-text-secondary">
-            The meeting you're looking for doesn't exist.
+            The meeting you are looking for does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/meetings">Back to Meetings</Link>
@@ -102,10 +86,12 @@ export default function MeetingDetailPage() {
     );
   }
 
+  const scheduledDate = meeting.scheduled_at ? new Date(meeting.scheduled_at) : null;
+
   return (
     <PageContainer
-      title={meeting.title}
-      description={`${meeting.type} • ${meeting.date} at ${meeting.time}`}
+      title={meeting.type}
+      description={meeting.agenda || `${meeting.status}`}
     >
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -127,15 +113,19 @@ export default function MeetingDetailPage() {
                 <Badge variant="default">{meeting.type}</Badge>
               </div>
 
-              <h3 className="mb-2 text-lg font-semibold text-text-primary">Agenda</h3>
-              <p className="text-text-secondary">{meeting.agenda}</p>
+              {meeting.agenda && (
+                <>
+                  <h3 className="mb-2 text-lg font-semibold text-text-primary">Agenda</h3>
+                  <p className="text-text-secondary">{meeting.agenda}</p>
+                </>
+              )}
 
-              {meeting.summary && (
+              {meeting.outcome && (
                 <>
                   <h3 className="mb-2 mt-6 text-lg font-semibold text-text-primary">
-                    Summary
+                    Outcome
                   </h3>
-                  <p className="text-text-secondary">{meeting.summary}</p>
+                  <p className="text-text-secondary">{meeting.outcome}</p>
                 </>
               )}
             </Card>
@@ -144,10 +134,10 @@ export default function MeetingDetailPage() {
               <Card className="p-6">
                 <h3 className="mb-4 text-lg font-semibold text-text-primary">Actions</h3>
                 <div className="flex gap-3">
-                  {meeting.meetingLink && (
+                  {meeting.meeting_link && (
                     <Button asChild>
                       <a
-                        href={meeting.meetingLink}
+                        href={meeting.meeting_link}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -169,48 +159,56 @@ export default function MeetingDetailPage() {
             <Card className="p-4">
               <h3 className="mb-3 font-medium text-text-primary">Details</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Date:</span>
-                  <span className="text-text-primary">{meeting.date}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Time:</span>
-                  <span className="text-text-primary">{meeting.time}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Duration:</span>
-                  <span className="text-text-primary">{meeting.duration} min</span>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="mb-3 font-medium text-text-primary">Participants</h3>
-              <div className="space-y-2">
-                {meeting.participants.map((participant, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-slate-light">
-                      <span className="text-xs font-medium text-text-primary">
-                        {participant
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </span>
-                    </div>
-                    <span className="text-sm text-text-primary">{participant}</span>
+                {scheduledDate && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Date:</span>
+                    <span className="text-text-primary">{scheduledDate.toLocaleDateString()}</span>
                   </div>
-                ))}
+                )}
+                {scheduledDate && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Time:</span>
+                    <span className="text-text-primary">{scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
+                {meeting.duration_minutes && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Duration:</span>
+                    <span className="text-text-primary">{meeting.duration_minutes} min</span>
+                  </div>
+                )}
               </div>
             </Card>
 
-            {meeting.meetingLink && (
+            {meeting.participants && meeting.participants.length > 0 && (
+              <Card className="p-4">
+                <h3 className="mb-3 font-medium text-text-primary">Participants</h3>
+                <div className="space-y-2">
+                  {meeting.participants.map((participant: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-slate-light">
+                        <span className="text-xs font-medium text-text-primary">
+                          {participant.user_id.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-text-primary">{participant.user_id}</span>
+                        <p className="text-xs text-text-tertiary">{participant.role}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {meeting.meeting_link && (
               <Card className="p-4">
                 <h3 className="mb-3 font-medium text-text-primary">Meeting Link</h3>
                 <a
-                  href={meeting.meetingLink}
+                  href={meeting.meeting_link}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-sm text-brand-primary hover:underline"

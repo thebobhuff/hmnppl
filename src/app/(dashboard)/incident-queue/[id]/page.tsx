@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   FileText,
@@ -19,33 +19,18 @@ import {
   Calendar,
   AlertTriangle,
   Clock,
-  CheckCircle,
-  MessageSquare,
   Shield,
 } from "lucide-react";
 import Link from "next/link";
-
-interface IncidentDetail {
-  id: string;
-  reference_number: string;
-  type: string;
-  severity: string;
-  status: string;
-  description: string;
-  employee_id: string;
-  reported_by: string;
-  incident_date: string;
-  created_at: string;
-  ai_confidence_score: number;
-}
+import { incidentsAPI } from "@/lib/api/client";
 
 export default function IncidentDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const id = params?.id as string;
+  const id = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [incident, setIncident] = useState<IncidentDetail | null>(null);
+  const [incident, setIncident] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
@@ -54,24 +39,21 @@ export default function IncidentDetailPage() {
   ]);
 
   useEffect(() => {
-    // Mock data
-    setTimeout(() => {
-      setIncident({
-        id: id || "1",
-        reference_number: "INC-2026-0001",
-        type: "tardiness",
-        severity: "medium",
-        status: "pending_hr_review",
-        description:
-          "Employee arrived 45 minutes late without prior notification. This is the second occurrence this month.",
-        employee_id: "Alice Johnson",
-        reported_by: "Bob Smith",
-        incident_date: "2026-04-07",
-        created_at: "2026-04-07T10:30:00Z",
-        ai_confidence_score: 0.87,
-      });
-      setLoading(false);
-    }, 300);
+    let active = true;
+    async function loadIncident() {
+      try {
+        const res = await incidentsAPI.get(id);
+        if (active && res.incident) {
+          setIncident(res.incident);
+        }
+      } catch (err) {
+        if (active) setError("Failed to load incident");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadIncident();
+    return () => { active = false; };
   }, [id]);
 
   if (loading) {
@@ -85,16 +67,16 @@ export default function IncidentDetailPage() {
     );
   }
 
-  if (!incident) {
+  if (error || !incident) {
     return (
       <PageContainer title="Incident Not Found">
         <Card className="p-8 text-center">
           <AlertTriangle className="mx-auto h-12 w-12 text-brand-warning" />
           <h2 className="mt-4 text-lg font-semibold text-text-primary">
-            Incident Not Found
+            {error || "Incident Not Found"}
           </h2>
           <p className="mt-2 text-text-secondary">
-            The incident you're looking for doesn't exist.
+            The incident you are looking for does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/incident-queue">Back to Queue</Link>
@@ -113,7 +95,7 @@ export default function IncidentDetailPage() {
 
   return (
     <PageContainer
-      title={`Incident ${incident.reference_number}`}
+      title={`Incident ${incident.reference_number || id.slice(0, 8)}`}
       description="View and manage this incident."
     >
       <div className="space-y-6">
@@ -145,20 +127,20 @@ export default function IncidentDetailPage() {
                 >
                   {incident.severity}
                 </Badge>
-                <Badge variant="default">{incident.type.replace(/_/g, " ")}</Badge>
+                <Badge variant="default">{String(incident.type || "incident").replace(/_/g, " ")}</Badge>
                 <Badge
                   variant={
                     incident.status === "pending_hr_review" ? "warning" : "success"
                   }
                 >
-                  {incident.status.replace(/_/g, " ")}
+                  {String(incident.status || "").replace(/_/g, " ")}
                 </Badge>
               </div>
 
               <h3 className="mb-2 text-lg font-semibold text-text-primary">
                 Description
               </h3>
-              <p className="text-text-secondary">{incident.description}</p>
+              <p className="text-text-secondary">{incident.description || "No description provided."}</p>
 
               <div className="mt-6 flex gap-3">
                 {incident.status === "pending_hr_review" && (
@@ -179,13 +161,13 @@ export default function IncidentDetailPage() {
                   <div className="mb-1 flex justify-between text-sm">
                     <span className="text-text-tertiary">Confidence Score</span>
                     <span className="font-medium text-text-primary">
-                      {Math.round(incident.ai_confidence_score * 100)}%
+                      {Math.round((incident.ai_confidence_score || 0) * 100)}%
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-brand-slate-light">
                     <div
                       className="h-full rounded-full bg-brand-primary"
-                      style={{ width: `${incident.ai_confidence_score * 100}%` }}
+                      style={{ width: `${(incident.ai_confidence_score || 0) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -197,28 +179,36 @@ export default function IncidentDetailPage() {
             <Card className="p-4">
               <h3 className="mb-3 font-medium text-text-primary">Details</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Employee:</span>
-                  <span className="text-text-primary">{incident.employee_id}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Reported by:</span>
-                  <span className="text-text-primary">{incident.reported_by}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Incident date:</span>
-                  <span className="text-text-primary">{incident.incident_date}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Created:</span>
-                  <span className="text-text-primary">
-                    {new Date(incident.created_at).toLocaleDateString()}
-                  </span>
-                </div>
+                {incident.employee_id && (
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Employee:</span>
+                    <span className="text-text-primary">{incident.employee_id}</span>
+                  </div>
+                )}
+                {incident.reported_by && (
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Reported by:</span>
+                    <span className="text-text-primary">{incident.reported_by}</span>
+                  </div>
+                )}
+                {incident.incident_date && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Incident date:</span>
+                    <span className="text-text-primary">{new Date(incident.incident_date).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {incident.created_at && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Created:</span>
+                    <span className="text-text-primary">
+                      {new Date(incident.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </Card>
           </div>

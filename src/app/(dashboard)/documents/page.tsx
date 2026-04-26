@@ -180,7 +180,7 @@ function DocumentCard({
 
       <div className="mt-4 flex gap-2">
         <Button asChild size="sm" variant={isSigned || isDisputed ? "outline" : "default"}>
-          <Link href={"/documents/\/view"}>
+          <Link href={isSigned || isDisputed ? `/documents/${doc.id}/view` : `/documents/${doc.id}/sign`}>
             {isSigned || isDisputed ? "View Details" : "Sign Document"}
             {(!isSigned && !isDisputed) && <ArrowRight className="ml-2 h-4 w-4" />}
           </Link>

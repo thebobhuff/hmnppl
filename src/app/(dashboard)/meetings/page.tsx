@@ -3,54 +3,16 @@
  */
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Calendar, Clock, Users, Link2, FileText, ArrowRight } from "lucide-react";
+import { Loader2, Calendar, Clock, Users, Link2, FileText, ArrowRight } from "lucide-react";
 import Link from "next/link";
-
-const MOCK_MEETINGS = [
-  {
-    id: "1",
-    title: "Disciplinary Review — J. Smith",
-    type: "Written Warning",
-    date: "2026-04-05",
-    time: "2:00 PM",
-    duration: 30,
-    participants: ["Maria Garcia", "David Park", "John Smith"],
-    status: "scheduled" as const,
-    meetingLink: "https://zoom.us/j/123456",
-    agenda: "Review attendance policy violation, discuss corrective actions.",
-  },
-  {
-    id: "2",
-    title: "PIP Follow-up — A. Williams",
-    type: "PIP",
-    date: "2026-04-05",
-    time: "4:30 PM",
-    duration: 45,
-    participants: ["Maria Garcia", "Alice Williams"],
-    status: "scheduled" as const,
-    meetingLink: "https://teams.microsoft.com/l/meetup-join/abc",
-    agenda: "Review PIP progress, discuss performance improvements.",
-  },
-  {
-    id: "3",
-    title: "Verbal Warning — B. Johnson",
-    type: "Verbal Warning",
-    date: "2026-04-01",
-    time: "10:00 AM",
-    duration: 20,
-    participants: ["Maria Garcia", "Bob Johnson"],
-    status: "completed" as const,
-    meetingLink: null,
-    summary: "Employee acknowledged the verbal warning and committed to improvement.",
-  },
-];
+import { meetingsAPI, type MeetingResponse } from "@/lib/api/client";
 
 export default function MeetingsPage() {
   const breadcrumbs = usePageBreadcrumbs([
@@ -58,13 +20,32 @@ export default function MeetingsPage() {
     { label: "Meetings" },
   ]);
 
+  const [meetings, setMeetings] = useState<MeetingResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadMeetings() {
+      try {
+        const res = await meetingsAPI.list(undefined, undefined, 50);
+        if (active) setMeetings(res.meetings);
+      } catch (err) {
+        console.error("Failed to load meetings", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadMeetings();
+    return () => { active = false; };
+  }, []);
+
   const upcoming = useMemo(
-    () => MOCK_MEETINGS.filter((m) => m.status === "scheduled"),
-    [],
+    () => meetings.filter((m) => m.status === "scheduled"),
+    [meetings],
   );
   const completed = useMemo(
-    () => MOCK_MEETINGS.filter((m) => m.status === "completed"),
-    [],
+    () => meetings.filter((m) => m.status === "completed"),
+    [meetings],
   );
 
   return (
@@ -72,121 +53,141 @@ export default function MeetingsPage() {
       title="Meetings"
       description="Manage disciplinary meetings and AI-generated summaries."
     >
-      <div className="grid gap-6">
-        {/* Upcoming */}
-        <div>
-          <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
-            <Calendar className="h-5 w-5 text-brand-primary" />
-            Upcoming Meetings
-          </h2>
-          {upcoming.length === 0 ? (
-            <Card className="p-6">
-              <EmptyState
-                title="No upcoming meetings"
-                description="Scheduled meetings will appear here."
-                icon={<Calendar className="h-8 w-8" />}
-              />
-            </Card>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {upcoming.map((meeting) => (
-                <Card key={meeting.id} className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-text-primary">
-                        {meeting.title}
-                      </h3>
-                      <Badge variant="warning" className="mt-1">
-                        {meeting.type}
-                      </Badge>
-                    </div>
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href={`/meetings/${meeting.id}`}>
-                        View
-                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                      </Link>
-                    </Button>
-                  </div>
-                  <div className="mt-3 space-y-1.5 text-xs text-text-tertiary">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {meeting.date} at {meeting.time}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {meeting.duration} minutes
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5" />
-                      {meeting.participants.join(", ")}
-                    </div>
-                    {meeting.meetingLink && (
-                      <div className="flex items-center gap-1.5">
-                        <Link2 className="h-3.5 w-3.5" />
-                        <a
-                          href={meeting.meetingLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-brand-primary hover:underline"
-                        >
-                          Join Meeting
-                        </a>
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-text-tertiary" />
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          {/* Upcoming */}
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
+              <Calendar className="h-5 w-5 text-brand-primary" />
+              Upcoming Meetings
+            </h2>
+            {upcoming.length === 0 ? (
+              <Card className="p-6">
+                <EmptyState
+                  title="No upcoming meetings"
+                  description="Scheduled meetings will appear here."
+                  icon={<Calendar className="h-8 w-8" />}
+                />
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {upcoming.map((meeting) => {
+                  const scheduledDate = meeting.scheduled_at ? new Date(meeting.scheduled_at) : null;
+                  return (
+                    <Card key={meeting.id} className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-sm font-medium text-text-primary">
+                            {meeting.type}
+                          </h3>
+                          <Badge variant="warning" className="mt-1">
+                            {meeting.status}
+                          </Badge>
+                        </div>
+                        <Button asChild size="sm" variant="ghost">
+                          <Link href={`/meetings/${meeting.id}`}>
+                            View
+                            <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                  {meeting.agenda && (
-                    <div className="mt-3 rounded-lg border border-border p-2">
-                      <p className="text-xs font-medium text-text-secondary">Agenda</p>
-                      <p className="mt-1 text-xs text-text-tertiary">{meeting.agenda}</p>
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+                      <div className="mt-3 space-y-1.5 text-xs text-text-tertiary">
+                        {scheduledDate && (
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {scheduledDate.toLocaleDateString()} at {scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
+                        {meeting.duration_minutes && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5" />
+                            {meeting.duration_minutes} minutes
+                          </div>
+                        )}
+                        {meeting.participants && meeting.participants.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5" />
+                            {meeting.participants.map(p => p.user_id).join(", ")}
+                          </div>
+                        )}
+                        {meeting.meeting_link && (
+                          <div className="flex items-center gap-1.5">
+                            <Link2 className="h-3.5 w-3.5" />
+                            <a
+                              href={meeting.meeting_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-brand-primary hover:underline"
+                            >
+                              Join Meeting
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                      {meeting.agenda && (
+                        <div className="mt-3 rounded-lg border border-border p-2">
+                          <p className="text-xs font-medium text-text-secondary">Agenda</p>
+                          <p className="mt-1 text-xs text-text-tertiary">{meeting.agenda}</p>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        {/* Completed */}
-        <div>
-          <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
-            <FileText className="h-5 w-5 text-brand-success" />
-            Completed Meetings
-          </h2>
-          {completed.length === 0 ? (
-            <Card className="p-6">
-              <EmptyState
-                title="No completed meetings"
-                description="Meeting summaries will appear here."
-                icon={<FileText className="h-8 w-8" />}
-              />
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {completed.map((meeting) => (
-                <Card key={meeting.id} className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-text-primary">
-                        {meeting.title}
-                      </h3>
-                      <Badge variant="success" className="mt-1">
-                        {meeting.type}
-                      </Badge>
-                    </div>
-                    <span className="text-xs text-text-tertiary">{meeting.date}</span>
-                  </div>
-                  {meeting.summary && (
-                    <div className="mt-3 rounded-lg border border-border p-2">
-                      <p className="text-xs font-medium text-text-secondary">Summary</p>
-                      <p className="mt-1 text-xs text-text-tertiary">{meeting.summary}</p>
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          )}
+          {/* Completed */}
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold text-text-primary">
+              <FileText className="h-5 w-5 text-brand-success" />
+              Completed Meetings
+            </h2>
+            {completed.length === 0 ? (
+              <Card className="p-6">
+                <EmptyState
+                  title="No completed meetings"
+                  description="Meeting summaries will appear here."
+                  icon={<FileText className="h-8 w-8" />}
+                />
+              </Card>
+            ) : (
+              <div className="grid gap-3">
+                {completed.map((meeting) => {
+                  const scheduledDate = meeting.scheduled_at ? new Date(meeting.scheduled_at) : null;
+                  return (
+                    <Card key={meeting.id} className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-sm font-medium text-text-primary">
+                            {meeting.type}
+                          </h3>
+                          <Badge variant="success" className="mt-1">
+                            {meeting.status}
+                          </Badge>
+                        </div>
+                        {scheduledDate && (
+                          <span className="text-xs text-text-tertiary">{scheduledDate.toLocaleDateString()}</span>
+                        )}
+                      </div>
+                      {meeting.outcome && (
+                        <div className="mt-3 rounded-lg border border-border p-2">
+                          <p className="text-xs font-medium text-text-secondary">Outcome</p>
+                          <p className="mt-1 text-xs text-text-tertiary">{meeting.outcome}</p>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </PageContainer>
   );
 }
