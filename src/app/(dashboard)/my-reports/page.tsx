@@ -258,7 +258,7 @@ export default function MyReportsPage() {
                         </p>
                         <div className="mt-2 flex items-center gap-4 text-xs text-text-tertiary">
                           <span>Employee: {report.employee_name || "Unknown"}</span>
-                          <span>•</span>
+                          <span>ΓÇó</span>
                           <span>Filed: {new Date(report.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>

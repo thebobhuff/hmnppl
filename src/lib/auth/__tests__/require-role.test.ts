@@ -21,6 +21,11 @@ vi.mock("../permissions", () => ({
   checkApiPermission: vi.fn(),
 }));
 
+// Mock CSRF validation so authorization tests are not tied to a Next request scope
+vi.mock("../../csrf", () => ({
+  validateCsrfToken: vi.fn().mockResolvedValue(null),
+}));
+
 import {
   withAuth,
   validateTenantOwnership,

@@ -223,7 +223,7 @@ export default function PlatformAnalyticsPage() {
                     <span className="text-sm text-text-secondary">{region.region}</span>
                     <div className="text-right">
                       <span className="text-sm font-medium text-text-primary">{region.users.toLocaleString()} users</span>
-                      <span className="mx-2 text-text-tertiary">•</span>
+                      <span className="mx-2 text-text-tertiary">ΓÇó</span>
                       <span className="text-sm text-text-tertiary">{region.companies} companies</span>
                     </div>
                   </div>

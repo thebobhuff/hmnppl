@@ -304,7 +304,7 @@ export default function ConductInterviewPage() {
                 <Users className="h-3 w-3" />
                 {w}
                 <button onClick={() => setWitnesses(witnesses.filter((_, idx) => idx !== i))} className="ml-1">
-                  ×
+                  ├ù
                 </button>
               </Badge>
             ))}

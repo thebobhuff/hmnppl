@@ -1,5 +1,5 @@
 /**
- * Employee Portal — Pending & Signed Documents
+ * Employee Portal ΓÇö Pending & Signed Documents
  *
  * Card-based list of pending documents (with CTA to sign)
  * and signed documents (with checkmarks).

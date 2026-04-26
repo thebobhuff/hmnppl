@@ -12,7 +12,7 @@
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
 
 [![License](https://img.shields.io/badge/License-Private-red?style=for-the-badge)]()
-[![Node](https://img.shields.io/badge/Node-%3E%3D18.17-339933?style=for-the-badge&logo=node.js)]()
+[![Node](https://img.shields.io/badge/Node-25.x-339933?style=for-the-badge&logo=node.js)]()
 [![PRD](https://img.shields.io/badge/PRD-Approved%2095%25-brightgreen?style=for-the-badge)]()
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge)]()
 [![Coverage](https://img.shields.io/badge/Coverage-98%25-brightgreen?style=for-the-badge)]()
@@ -302,7 +302,7 @@ See [security-review.md](ai_docs/ai-hr-platform/security-review.md) for the full
 
 ### Prerequisites
 
-- Node.js >= 18.17.0
+- Node.js 25.x
 - Python 3.12+
 - Supabase CLI
 - Docker (for local Supabase)

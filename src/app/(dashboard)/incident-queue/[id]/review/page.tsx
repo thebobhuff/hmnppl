@@ -217,6 +217,11 @@ export default function DocumentReviewPage() {
   const confidence = incident.ai_confidence_score ?? 0;
   const recommendation = data.aiRecommendation ?? {};
   const escalationLevel = incident.escalation_level ?? 1;
+  const riskFactors = data.riskFactors ?? [];
+  const coachingTopics = data.coachingTopics ?? [];
+  const trainingGaps = data.trainingGaps ?? [];
+  const reasoning =
+    typeof recommendation.reasoning === "string" ? recommendation.reasoning : null;
 
   const confidenceColor = confidence >= 0.85 ? "text-green-400" : confidence >= 0.7 ? "text-amber-400" : "text-red-400";
   const confidenceBg = confidence >= 0.85 ? "bg-green-500/20" : confidence >= 0.7 ? "bg-amber-500/20" : "bg-red-500/20";
@@ -423,13 +428,13 @@ export default function DocumentReviewPage() {
               </div>
 
               {/* Risk Factors */}
-              {data.riskFactors.length > 0 && (
+              {riskFactors.length > 0 && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
                     <AlertTriangle className="h-3.5 w-3.5" /> Risk Factors
                   </p>
                   <ul className="mt-2 space-y-1">
-                    {data.riskFactors.map((factor, i) => (
+                    {riskFactors.map((factor, i) => (
                       <li key={i} className="text-xs text-text-secondary">- {factor}</li>
                     ))}
                   </ul>
@@ -437,13 +442,13 @@ export default function DocumentReviewPage() {
               )}
 
               {/* Coaching */}
-              {data.coachingTopics.length > 0 && (
+              {coachingTopics.length > 0 && (
                 <div className="rounded-lg border border-brand-primary/30 bg-brand-primary/5 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-primary">
                     <Sparkles className="h-3.5 w-3.5" /> Coaching Recommended
                   </p>
                   <ul className="mt-2 space-y-1">
-                    {data.coachingTopics.map((topic, i) => (
+                    {coachingTopics.map((topic, i) => (
                       <li key={i} className="text-xs text-text-secondary">- {topic}</li>
                     ))}
                   </ul>
@@ -451,13 +456,13 @@ export default function DocumentReviewPage() {
               )}
 
               {/* Training Gaps */}
-              {data.trainingGaps.length > 0 && (
+              {trainingGaps.length > 0 && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
                     <TrendingUp className="h-3.5 w-3.5" /> Training Gaps
                   </p>
                   <ul className="mt-2 space-y-1">
-                    {data.trainingGaps.map((gap, i) => (
+                    {trainingGaps.map((gap, i) => (
                       <li key={i} className="text-xs text-text-secondary">- {gap}</li>
                     ))}
                   </ul>
@@ -465,10 +470,10 @@ export default function DocumentReviewPage() {
               )}
 
               {/* AI Reasoning */}
-              {recommendation.reasoning && (
+              {reasoning && (
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs font-semibold text-text-tertiary">AI Reasoning</p>
-                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">{recommendation.reasoning as string}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">{reasoning}</p>
                 </div>
               )}
             </div>

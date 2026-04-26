@@ -1,18 +1,10 @@
 /**
- * Document Signing — Employee signs disciplinary documents.
- *
- * Features:
- * - Full document render in readable format
- * - "View referenced policy" side panel
- * - Acknowledgment checkbox (required)
- * - E-Signature Canvas (draw + type modes)
- * - Dispute button (if company enables it)
- * - Confirmation modal with legal language
- * - Signature captures: IP, timestamp, user agent, SHA-256 hash
+ * Document Signing — Employee signs or disputes disciplinary documents.
  */
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { Card } from "@/components/ui/card";
@@ -27,73 +19,31 @@ import {
   ModalFooter,
 } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { csrfFetch } from "@/lib/csrf-client";
 import {
-  FileText,
-  Pen,
-  Type,
-  Undo2,
-  Eraser,
-  CheckCircle,
   AlertTriangle,
+  CheckCircle,
+  Eraser,
+  FileText,
+  Loader2,
+  Pen,
   Shield,
-  X,
+  Type,
 } from "lucide-react";
 import Link from "next/link";
 
-// ---------------------------------------------------------------------------
-// Mock Data
-// ---------------------------------------------------------------------------
-
-const MOCK_DOCUMENT = {
-  id: "1",
-  reference: "INC-2026-0042",
-  title: "Written Warning — Attendance Policy",
-  type: "Written Warning",
-  content: `WRITTEN WARNING — ATTENDANCE POLICY VIOLATION
-
-Employee: John Smith
-Position: Software Engineer
-Department: Engineering
-Date: March 15, 2026
-Reference: INC-2026-0042
-
-INCIDENT SUMMARY
-
-On March 15, 2026, the above-named employee arrived 45 minutes late to work without providing prior notice to their supervisor. This marks the third documented occurrence of tardiness within the current calendar month.
-
-POLICY VIOLATION
-
-This incident constitutes a violation of the Attendance & Punctuality Policy, Section 3.2: "Repeated Tardiness." The policy states that three or more unexcused late arrivals within a 30-day period warrant a written warning.
-
-PREVIOUS INCIDENTS
-
-1. INC-2026-0028 (Feb 12, 2026) — 20 minutes late, verbal warning issued
-2. INC-2026-0035 (Mar 1, 2026) — 30 minutes late, verbal warning issued
-
-REQUIRED ACTIONS
-
-1. Employee must arrive on time for all scheduled shifts for the next 60 days
-2. Employee must notify supervisor at least 1 hour before scheduled start time if unable to arrive on time
-3. Employee must attend the scheduled meeting with HR representative
-
-CONSEQUENCES OF NON-COMPLIANCE
-
-Failure to comply with the above requirements may result in further disciplinary action, up to and including a Performance Improvement Plan (PIP) or termination of employment.
-
-EMPLOYEE ACKNOWLEDGMENT
-
-I acknowledge receipt of this written warning. I understand the required actions and consequences of non-compliance.
-
-HR Representative: Maria Garcia
-Date: ___________`,
-  policyReference: {
-    title: "Attendance & Punctuality Policy",
-    section: "Section 3.2 — Repeated Tardiness",
-    content:
-      "Three or more unexcused late arrivals within a 30-day period shall result in progressive disciplinary action: (1) Verbal Warning, (2) Written Warning, (3) Performance Improvement Plan, (4) Termination Review.",
-  },
-};
+interface EmployeeDocumentDetail {
+  id: string;
+  reference: string;
+  title: string;
+  type: string;
+  content: string | null;
+  status: string;
+  action_type: string;
+  signed_at: string | null;
+  disputed: boolean;
+}
 
 const SIGNATURE_FONTS = [
   { name: "Script", value: "'Dancing Script', cursive" },
@@ -101,22 +51,20 @@ const SIGNATURE_FONTS = [
   { name: "Formal", value: "'Playfair Display', serif" },
 ];
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+export default function DocumentSigningPage() {
+  const params = useParams();
+  const documentId = params?.id as string;
 
-export default function DocumentSigningPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const breadcrumbs = usePageBreadcrumbs([
+  usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
     { label: "My Documents", href: "/documents" },
-    { label: `Sign: ${MOCK_DOCUMENT.title}` },
+    { label: "Sign Document" },
   ]);
 
-  const [showPolicy, setShowPolicy] = useState(false);
+  const [document, setDocument] = useState<EmployeeDocumentDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [signatureMode, setSignatureMode] = useState<"draw" | "type">("draw");
   const [typedSignature, setTypedSignature] = useState("");
@@ -126,11 +74,35 @@ export default function DocumentSigningPage({
   const [disputeReason, setDisputeReason] = useState("");
   const [signed, setSigned] = useState(false);
   const [disputed, setDisputed] = useState(false);
-
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Canvas setup
+  useEffect(() => {
+    let active = true;
+    async function loadDocument() {
+      try {
+        const res = await fetch(`/api/v1/documents/${documentId}`);
+        if (!res.ok) throw new Error(`Failed to load document: ${res.status}`);
+        const json = (await res.json()) as { document: EmployeeDocumentDetail };
+        if (active) {
+          setDocument(json.document);
+          setSigned(Boolean(json.document.signed_at) || json.document.status === "signed");
+          setDisputed(json.document.disputed || json.document.status === "disputed");
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : "Failed to load document");
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    if (documentId) loadDocument();
+    return () => {
+      active = false;
+    };
+  }, [documentId]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -140,7 +112,7 @@ export default function DocumentSigningPage({
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, []);
+  }, [signatureMode]);
 
   const getCanvasPoint = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -153,8 +125,8 @@ export default function DocumentSigningPage({
       };
     }
     return {
-      x: (e as React.MouseEvent).clientX - rect.left,
-      y: (e as React.MouseEvent).clientY - rect.top,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
     };
   }, []);
 
@@ -184,81 +156,107 @@ export default function DocumentSigningPage({
     [isDrawing, getCanvasPoint],
   );
 
-  const stopDrawing = useCallback(() => {
-    setIsDrawing(false);
-  }, []);
-
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ctx = canvas?.getContext("2d");
+    if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  const handleSign = () => {
-    if (!acknowledged) return;
-    setConfirmModalOpen(true);
+  const getSignatureData = () => {
+    if (signatureMode === "type") return typedSignature.trim();
+    return canvasRef.current?.toDataURL() ?? "";
   };
 
-  const handleConfirmSign = () => {
-    // Capture signature data
-    let signatureData = "";
-    if (signatureMode === "draw" && canvasRef.current) {
-      signatureData = canvasRef.current.toDataURL();
-    } else {
-      signatureData = typedSignature;
+  const handleConfirmSign = async () => {
+    if (!document) return;
+    const signatureData = getSignatureData();
+    if (!signatureData) return;
+
+    setSubmitting(true);
+    try {
+      const res = await csrfFetch(`/api/v1/documents/${document.id}/sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signatureType: signatureMode === "draw" ? "drawn" : "typed",
+          signatureData,
+        }),
+      });
+      if (!res.ok) throw new Error(`Failed to sign document: ${res.status}`);
+      setConfirmModalOpen(false);
+      setSigned(true);
+    } catch (signError) {
+      setError(signError instanceof Error ? signError.message : "Failed to sign document");
+    } finally {
+      setSubmitting(false);
     }
-
-    // Compute SHA-256 hash
-    const contentToHash =
-      MOCK_DOCUMENT.content + signatureData + new Date().toISOString();
-    // In production: crypto.subtle.digest("SHA-256", new TextEncoder().encode(contentToHash))
-    const mockHash = btoa(contentToHash).substring(0, 64);
-
-    // Submit to API
-    console.log("Signing document:", {
-      documentId: MOCK_DOCUMENT.id,
-      signatureType: signatureMode,
-      signatureData: signatureData.substring(0, 50) + "...",
-      ip: "192.168.1.1", // Would come from server
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-      contentHash: mockHash,
-    });
-
-    setConfirmModalOpen(false);
-    setSigned(true);
   };
 
-  const handleDispute = () => {
-    if (disputeReason.length < 50) return;
-    console.log("Disputing document:", {
-      documentId: MOCK_DOCUMENT.id,
-      reason: disputeReason,
-      timestamp: new Date().toISOString(),
-    });
-    setDisputeModalOpen(false);
-    setDisputed(true);
+  const handleDispute = async () => {
+    if (!document || disputeReason.length < 50) return;
+
+    setSubmitting(true);
+    try {
+      const res = await csrfFetch(`/api/v1/documents/${document.id}/dispute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: disputeReason }),
+      });
+      if (!res.ok) throw new Error(`Failed to dispute document: ${res.status}`);
+      setDisputeModalOpen(false);
+      setDisputed(true);
+    } catch (disputeError) {
+      setError(disputeError instanceof Error ? disputeError.message : "Failed to dispute document");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <PageContainer title="Sign Document">
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-96 rounded-lg" />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (error || !document) {
+    return (
+      <PageContainer title="Document Unavailable">
+        <Card className="mx-auto max-w-lg p-8 text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-brand-error" />
+          <h2 className="mt-4 font-display text-xl font-semibold text-text-primary">
+            Document Unavailable
+          </h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            {error ?? "This document could not be found."}
+          </p>
+          <Button asChild className="mt-6">
+            <Link href="/documents">Back to Documents</Link>
+          </Button>
+        </Card>
+      </PageContainer>
+    );
+  }
 
   if (signed) {
     return (
-      <PageContainer title="Document Signed" description="">
+      <PageContainer title="Document Signed">
         <Card className="mx-auto max-w-lg p-8 text-center">
           <CheckCircle className="mx-auto h-16 w-16 text-brand-success" />
           <h2 className="mt-4 font-display text-xl font-semibold text-text-primary">
             Document Signed Successfully
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Your signature has been recorded. A copy has been emailed to you.
+            Your signature has been recorded.
           </p>
           <div className="mt-4 rounded-lg bg-brand-slate-light p-3 text-left">
             <p className="text-xs text-text-tertiary">Document</p>
-            <p className="text-sm font-medium text-text-primary">{MOCK_DOCUMENT.title}</p>
-            <p className="mt-1 text-xs text-text-tertiary">
-              Reference: {MOCK_DOCUMENT.reference}
-            </p>
+            <p className="text-sm font-medium text-text-primary">{document.title}</p>
+            <p className="mt-1 text-xs text-text-tertiary">Reference: {document.reference}</p>
             <p className="text-xs text-text-tertiary">
               Signed: {new Date().toLocaleString()}
             </p>
@@ -273,15 +271,14 @@ export default function DocumentSigningPage({
 
   if (disputed) {
     return (
-      <PageContainer title="Document Disputed" description="">
+      <PageContainer title="Document Disputed">
         <Card className="mx-auto max-w-lg p-8 text-center">
           <AlertTriangle className="mx-auto h-16 w-16 text-brand-error" />
           <h2 className="mt-4 font-display text-xl font-semibold text-text-primary">
             Dispute Submitted
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Your dispute has been sent to HR for review. You will be notified of the
-            outcome.
+            Your dispute has been sent to HR for review.
           </p>
           <Button asChild className="mt-6">
             <Link href="/documents">Back to Documents</Link>
@@ -292,51 +289,43 @@ export default function DocumentSigningPage({
   }
 
   return (
-    <PageContainer title="Sign Document" description={MOCK_DOCUMENT.title}>
+    <PageContainer title="Sign Document" description={document.title}>
       <div className="grid gap-4 lg:grid-cols-[3fr_1fr]">
-        {/* Document Content */}
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-text-secondary" />
               <h2 className="font-display text-lg font-semibold text-text-primary">
-                {MOCK_DOCUMENT.title}
+                {document.title}
               </h2>
             </div>
-            <Badge variant="warning">{MOCK_DOCUMENT.type}</Badge>
+            <Badge variant="warning">{formatLabel(document.type)}</Badge>
           </div>
 
           <div className="bg-brand-slate-dark max-h-[500px] overflow-y-auto rounded-lg border border-border p-6">
             <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-text-secondary">
-              {MOCK_DOCUMENT.content}
+              {document.content ?? "No inline document content is available."}
             </pre>
           </div>
         </Card>
 
-        {/* Right Panel */}
         <div className="grid gap-4">
-          {/* Policy Reference */}
           <Card className="p-4">
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-text-primary">
               <Shield className="h-4 w-4" />
-              Referenced Policy
+              Document Context
             </h3>
             <p className="text-sm font-medium text-text-primary">
-              {MOCK_DOCUMENT.policyReference.title}
+              {formatLabel(document.action_type)}
             </p>
-            <p className="text-xs text-text-secondary">
-              {MOCK_DOCUMENT.policyReference.section}
-            </p>
+            <p className="text-xs text-text-secondary">Reference {document.reference}</p>
             <p className="mt-2 text-xs text-text-tertiary">
-              {MOCK_DOCUMENT.policyReference.content}
+              This document was generated from the approved disciplinary action and company policy snapshot.
             </p>
           </Card>
 
-          {/* Acknowledgment */}
           <Card className="p-4">
-            <h3 className="mb-3 text-sm font-semibold text-text-primary">
-              Acknowledgment
-            </h3>
+            <h3 className="mb-3 text-sm font-semibold text-text-primary">Acknowledgment</h3>
             <label className="flex items-start gap-3">
               <input
                 type="checkbox"
@@ -345,19 +334,13 @@ export default function DocumentSigningPage({
                 className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
               />
               <p className="text-sm text-text-secondary">
-                I acknowledge receipt and understanding of this document. I understand the
-                required actions and consequences of non-compliance.
+                I acknowledge receipt and understanding of this document. I understand the required actions and consequences of non-compliance.
               </p>
             </label>
           </Card>
 
-          {/* Signature */}
           <Card className="p-4">
-            <h3 className="mb-3 text-sm font-semibold text-text-primary">
-              Your Signature
-            </h3>
-
-            {/* Mode Selector */}
+            <h3 className="mb-3 text-sm font-semibold text-text-primary">Your Signature</h3>
             <div className="mb-3 flex gap-1 rounded-lg bg-brand-slate-light p-1">
               <button
                 onClick={() => setSignatureMode("draw")}
@@ -383,8 +366,7 @@ export default function DocumentSigningPage({
               </button>
             </div>
 
-            {/* Draw Mode */}
-            {signatureMode === "draw" && (
+            {signatureMode === "draw" ? (
               <div>
                 <div className="relative rounded-lg border border-border bg-white">
                   <canvas
@@ -394,24 +376,19 @@ export default function DocumentSigningPage({
                     className="w-full touch-none"
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
+                    onMouseUp={() => setIsDrawing(false)}
+                    onMouseLeave={() => setIsDrawing(false)}
                     onTouchStart={startDrawing}
                     onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
+                    onTouchEnd={() => setIsDrawing(false)}
                   />
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <Button variant="outline" size="sm" onClick={clearCanvas}>
-                    <Eraser className="mr-1 h-3 w-3" />
-                    Clear
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" onClick={clearCanvas} className="mt-2">
+                  <Eraser className="mr-1 h-3 w-3" />
+                  Clear
+                </Button>
               </div>
-            )}
-
-            {/* Type Mode */}
-            {signatureMode === "type" && (
+            ) : (
               <div>
                 <input
                   type="text"
@@ -444,14 +421,11 @@ export default function DocumentSigningPage({
             )}
           </Card>
 
-          {/* Actions */}
           <div className="grid gap-2">
-            <Button onClick={handleSign} disabled={!acknowledged} size="lg">
+            <Button onClick={() => setConfirmModalOpen(true)} disabled={!acknowledged} size="lg">
               <CheckCircle className="mr-2 h-5 w-5" />
               Sign Document
             </Button>
-
-            {/* Dispute (if enabled) */}
             <Button variant="outline" onClick={() => setDisputeModalOpen(true)} size="sm">
               <AlertTriangle className="mr-2 h-4 w-4" />
               Dispute This Document
@@ -460,76 +434,70 @@ export default function DocumentSigningPage({
         </div>
       </div>
 
-      {/* Confirm Sign Modal */}
       <Modal open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
         <ModalContent size="md">
           <ModalHeader>
             <ModalTitle>Confirm Signature</ModalTitle>
             <ModalDescription>
-              This signature is legally binding under the ESIGN Act and UETA. By
-              confirming, you acknowledge that:
+              This signature is legally binding under the ESIGN Act and UETA.
             </ModalDescription>
           </ModalHeader>
-          <div className="space-y-2 py-2">
-            <ul className="list-inside space-y-1 text-sm text-text-secondary">
-              <li>• You have read and understood this document</li>
-              <li>• You consent to electronic signature</li>
-              <li>
-                • Your signature will be recorded with timestamp, IP address, and device
-                information
-              </li>
-            </ul>
-          </div>
+          <ul className="list-inside space-y-1 py-2 text-sm text-text-secondary">
+            <li>- You have read and understood this document</li>
+            <li>- You consent to electronic signature</li>
+            <li>- Your signature will be recorded with timestamp and device information</li>
+          </ul>
           <ModalFooter>
             <Button variant="outline" onClick={() => setConfirmModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmSign}>
-              <CheckCircle className="mr-1.5 h-4 w-4" />
+            <Button onClick={handleConfirmSign} disabled={submitting}>
+              {submitting ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="mr-1.5 h-4 w-4" />
+              )}
               Confirm & Sign
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
-      {/* Dispute Modal */}
       <Modal open={disputeModalOpen} onOpenChange={setDisputeModalOpen}>
         <ModalContent size="md">
           <ModalHeader>
             <ModalTitle>Dispute Document</ModalTitle>
             <ModalDescription>
-              If you disagree with the contents of this document, you may submit a
-              dispute. HR will review your dispute and respond within 5 business days.
+              If you disagree with the contents of this document, submit a dispute for HR review.
             </ModalDescription>
           </ModalHeader>
           <div className="space-y-3 py-2">
-            <div>
-              <label className="block text-sm font-medium text-text-primary">
-                Reason for Dispute <span className="text-brand-error">*</span>
-              </label>
-              <Textarea
-                value={disputeReason}
-                onChange={(e) => setDisputeReason(e.target.value)}
-                placeholder="Explain why you are disputing this document..."
-                className="mt-2 min-h-[100px]"
-                maxLength={2000}
-              />
-              <p
-                className={`mt-1 text-xs ${disputeReason.length < 50 && disputeReason.length > 0 ? "text-brand-error" : "text-text-tertiary"}`}
-              >
-                {disputeReason.length}/2000 (minimum 50 characters)
-              </p>
-            </div>
+            <label className="block text-sm font-medium text-text-primary">
+              Reason for Dispute <span className="text-brand-error">*</span>
+            </label>
+            <Textarea
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              placeholder="Explain why you are disputing this document..."
+              className="min-h-[100px]"
+              maxLength={2000}
+            />
+            <p
+              className={`text-xs ${
+                disputeReason.length < 50 && disputeReason.length > 0
+                  ? "text-brand-error"
+                  : "text-text-tertiary"
+              }`}
+            >
+              {disputeReason.length}/2000 (minimum 50 characters)
+            </p>
           </div>
           <ModalFooter>
             <Button variant="outline" onClick={() => setDisputeModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              variant="default"
-              onClick={handleDispute}
-              disabled={disputeReason.length < 50}
-            >
+            <Button onClick={handleDispute} disabled={disputeReason.length < 50 || submitting}>
+              {submitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               Submit Dispute
             </Button>
           </ModalFooter>
@@ -537,4 +505,8 @@ export default function DocumentSigningPage({
       </Modal>
     </PageContainer>
   );
+}
+
+function formatLabel(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }

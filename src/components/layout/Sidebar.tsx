@@ -37,8 +37,8 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
 
   const effectiveRole = useAuthStore((s) => s.effectiveRole) ?? user?.role;
-const navItems = user ? getNavigationItems(effectiveRole) : [];
-  const mobileNavItems = user ? getMobileNavItems(effectiveRole) : [];
+  const navItems = effectiveRole ? getNavigationItems(effectiveRole) : [];
+  const mobileNavItems = effectiveRole ? getMobileNavItems(effectiveRole) : [];
 
   const isMobile = breakpoint === "mobile";
   const isTablet = breakpoint === "tablet";

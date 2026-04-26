@@ -1,5 +1,5 @@
 /**
- * Meetings Page — List of upcoming and completed meetings.
+ * Meetings Page ΓÇö List of upcoming and completed meetings.
  */
 "use client";
 

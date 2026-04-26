@@ -19,6 +19,10 @@ import {
   Calendar,
   FileBarChart,
   PlusCircle,
+  Activity,
+  GraduationCap,
+  MessagesSquare,
+  Search,
   type LucideProps,
 } from "lucide-react";
 import type { FC } from "react";
@@ -37,6 +41,10 @@ const ICON_MAP: Record<string, FC<LucideProps>> = {
   Calendar,
   FileBarChart,
   PlusCircle,
+  Activity,
+  GraduationCap,
+  MessagesSquare,
+  Search,
 };
 
 interface DynamicIconProps extends LucideProps {
