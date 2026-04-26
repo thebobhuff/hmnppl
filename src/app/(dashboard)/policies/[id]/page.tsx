@@ -11,17 +11,18 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { policiesAPI, type PolicyResponse } from "@/lib/api/client";
 import { useParams } from "next/navigation";
 import { ArrowLeft, FileText, Shield, Calendar, Edit3 } from "lucide-react";
 import Link from "next/link";
+import { policiesAPI } from "@/lib/api/client";
 
 export default function PolicyDetailPage() {
   const params = useParams();
-  const id = params?.id as string;
+  const id = params.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [policy, setPolicy] = useState<PolicyResponse | null>(null);
+  const [policy, setPolicy] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   usePageBreadcrumbs([
     { label: "Home", href: "/dashboard" },
@@ -34,18 +35,17 @@ export default function PolicyDetailPage() {
     async function loadPolicy() {
       try {
         const res = await policiesAPI.get(id);
-        if (active) setPolicy(res.policy);
-      } catch (error) {
-        console.error("Failed to load policy", error);
-        if (active) setPolicy(null);
+        if (active && res.policy) {
+          setPolicy(res.policy);
+        }
+      } catch (err) {
+        if (active) setError("Failed to load policy");
       } finally {
         if (active) setLoading(false);
       }
     }
-    if (id) loadPolicy();
-    return () => {
-      active = false;
-    };
+    loadPolicy();
+    return () => { active = false; };
   }, [id]);
 
   if (loading) {
@@ -59,16 +59,16 @@ export default function PolicyDetailPage() {
     );
   }
 
-  if (!policy) {
+  if (error || !policy) {
     return (
       <PageContainer title="Policy Not Found">
         <Card className="p-8 text-center">
           <FileText className="mx-auto h-12 w-12 text-brand-warning" />
           <h2 className="mt-4 text-lg font-semibold text-text-primary">
-            Policy Not Found
+            {error || "Policy Not Found"}
           </h2>
           <p className="mt-2 text-text-secondary">
-            The requested policy does not exist.
+            The policy you are looking for does not exist.
           </p>
           <Button asChild className="mt-4">
             <Link href="/policies">Back to Policies</Link>
@@ -80,8 +80,8 @@ export default function PolicyDetailPage() {
 
   return (
     <PageContainer
-      title={policy.title}
-      description={`Version ${policy.version} • ${policy.category}`}
+      title={policy.name || policy.title || "Policy"}
+      description={`Version ${policy.version || 1} • ${policy.category || "General"}`}
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -108,7 +108,7 @@ export default function PolicyDetailPage() {
                 <Badge variant={policy.is_active ? "success" : "default"}>
                   {policy.is_active ? "Active" : "Inactive"}
                 </Badge>
-                <Badge variant="outline">v{policy.version}</Badge>
+                <Badge variant="outline">v{policy.version || 1}</Badge>
               </div>
 
               <div className="prose prose-sm max-w-none">
@@ -126,20 +126,17 @@ export default function PolicyDetailPage() {
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4 text-text-tertiary" />
                   <span className="text-text-tertiary">Category:</span>
-                  <span className="capitalize text-text-primary">{policy.category}</span>
+                  <span className="capitalize text-text-primary">{policy.category || "General"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Rules:</span>
-                  <span className="text-text-primary">{policy.rules.length}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-text-tertiary" />
-                  <span className="text-text-tertiary">Created:</span>
-                  <span className="text-text-primary">
-                    {new Date(policy.created_at).toLocaleDateString()}
-                  </span>
-                </div>
+                {policy.created_at && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-text-tertiary" />
+                    <span className="text-text-tertiary">Created:</span>
+                    <span className="text-text-primary">
+                      {new Date(policy.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </Card>
           </div>

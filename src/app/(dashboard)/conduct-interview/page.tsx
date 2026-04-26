@@ -1,333 +1,481 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  BookOpenCheck,
-  CheckCircle2,
+  Mic,
   FileText,
-  HeartHandshake,
-  MessagesSquare,
-  ShieldCheck,
+  Users,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  ChevronRight,
+  ChevronLeft,
+  Save,
+  Play,
+  Upload,
+  Loader2,
 } from "lucide-react";
 
-type InterviewStepId =
-  | "facts"
-  | "employee_response"
-  | "prior_context"
-  | "training_review"
-  | "resolution";
-
-interface InterviewStep {
-  id: InterviewStepId;
-  title: string;
-  prompt: string;
-  coaching: string;
-  documentation: string[];
+interface Question {
+  id: string;
+  text: string;
+  type: "text" | "yes_no" | "scale";
+  required: boolean;
 }
 
-const STEPS: InterviewStep[] = [
-  {
-    id: "facts",
-    title: "Incident facts",
-    prompt:
-      "Document only observable facts: what happened, when it happened, where it happened, and who was present.",
-    coaching:
-      "Keep your tone neutral. Use language like \"I want to understand what happened and align on expectations\" instead of blame or frustration.",
-    documentation: [
-      "Date, time, and location",
-      "Specific policy or expectation involved",
-      "Witnesses or evidence",
-    ],
-  },
-  {
-    id: "employee_response",
-    title: "Employee response",
-    prompt:
-      "Capture the employee's explanation or any context they shared. Note whether they accepted, clarified, or disputed the concern.",
-    coaching:
-      "Leave room for context. Try: \"Help me understand what was happening from your perspective.\"",
-    documentation: [
-      "Employee explanation",
-      "Any barriers they identified",
-      "Any dispute or correction to the facts",
-    ],
-  },
-  {
-    id: "prior_context",
-    title: "Prior context",
-    prompt:
-      "Identify whether this is a repeat of the same issue, a related pattern, or a new type of concern.",
-    coaching:
-      "Separate patterns from assumptions. A repeat issue should be tied to prior dates and records, not general impressions.",
-    documentation: [
-      "Prior verbal conversations",
-      "Prior written warnings or PIPs",
-      "Whether this is same issue, same category, or new issue",
-    ],
-  },
-  {
-    id: "training_review",
-    title: "Training review",
-    prompt:
-      "List training, coaching, job aids, or process guidance already provided. If none exists, document the gap before escalating.",
-    coaching:
-      "The goal is correction before punishment. If training was missing or unclear, acknowledge it and set a support plan.",
-    documentation: [
-      "Training already completed",
-      "Training still needed",
-      "Manager follow-up commitments",
-    ],
-  },
-  {
-    id: "resolution",
-    title: "Resolution and next steps",
-    prompt:
-      "Write the expectation, employee action items, support offered, and follow-up date. Keep consequences factual and proportional.",
-    coaching:
-      "Close with clarity and respect. Try: \"I want you to be successful, and this is the standard we need you to meet.\"",
-    documentation: [
-      "Clear expectation",
-      "Correction date or follow-up date",
-      "Training or support assigned",
-    ],
-  },
-];
+const interviewTemplates: Record<string, Question[]> = {
+  tardiness: [
+    { id: "1", text: "Can you describe what happened on the morning of the incident?", type: "text", required: true },
+    { id: "2", text: "Did you notify your supervisor before your scheduled start time?", type: "yes_no", required: true },
+    { id: "3", text: "How many times has this type of issue occurred in the past 30 days?", type: "text", required: true },
+    { id: "4", text: "On a scale of 1-10, how would you rate your commitment to being on time?", type: "scale", required: true },
+    { id: "5", text: "What steps will you take to ensure punctuality going forward?", type: "text", required: true },
+  ],
+  misconduct: [
+    { id: "1", text: "Please describe the incident in your own words.", type: "text", required: true },
+    { id: "2", text: "Do you understand why this behavior is considered a violation?", type: "yes_no", required: true },
+    { id: "3", text: "Were there any circumstances that contributed to this incident?", type: "text", required: false },
+    { id: "4", text: "How do you plan to prevent this from happening again?", type: "text", required: true },
+  ],
+  performance: [
+    { id: "1", text: "Are you aware of the performance expectations for your role?", type: "yes_no", required: true },
+    { id: "2", text: "Can you identify the areas where you have struggled to meet expectations?", type: "text", required: true },
+    { id: "3", text: "What support do you need from management to improve?", type: "text", required: true },
+    { id: "4", text: "On a scale of 1-10, how confident are you in meeting expectations within 60 days?", type: "scale", required: true },
+  ],
+};
 
-const HIGH_RISK_TERMS = [
-  "safety",
-  "violence",
-  "threat",
-  "harassment",
-  "fraud",
-  "embezzle",
-  "protected class",
-  "discrimination",
-];
-
-function detectRisk(notes: Record<InterviewStepId, string>) {
-  const text = Object.values(notes).join(" ").toLowerCase();
-  return HIGH_RISK_TERMS.filter((term) => text.includes(term));
-}
-
-function buildSummary(notes: Record<InterviewStepId, string>) {
-  return STEPS.map((step) => ({
-    label: step.title,
-    value: notes[step.id].trim() || "Not documented yet",
-  }));
-}
+type Step = "prepare" | "questions" | "evidence" | "outcome" | "summary";
 
 export default function ConductInterviewPage() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [notes, setNotes] = useState<Record<InterviewStepId, string>>({
-    facts: "",
-    employee_response: "",
-    prior_context: "",
-    training_review: "",
-    resolution: "",
-  });
+  const breadcrumbs = usePageBreadcrumbs([
+    { label: "Home", href: "/dashboard" },
+    { label: "Conduct Interview" },
+  ]);
 
-  const currentStep = STEPS[currentIndex];
-  const riskTerms = useMemo(() => detectRisk(notes), [notes]);
-  const summary = useMemo(() => buildSummary(notes), [notes]);
-  const completeCount = STEPS.filter((step) => notes[step.id].trim().length > 0).length;
-  const isComplete = completeCount === STEPS.length;
+  const [step, setStep] = useState<Step>("prepare");
+  const [incidentType, setIncidentType] = useState<string>("tardiness");
+  const [employeeName, setEmployeeName] = useState("");
+  const [incidentRef, setIncidentRef] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [witnesses, setWitnesses] = useState<string[]>([]);
+  const [newWitness, setNewWitness] = useState("");
+  const [notes, setNotes] = useState("");
+  const [outcome, setOutcome] = useState<string>("");
+  const [actionPlan, setActionPlan] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const steps: { id: Step; label: string; icon: any }[] = [
+    { id: "prepare", label: "Preparation", icon: CheckCircle },
+    { id: "questions", label: "Questions", icon: Mic },
+    { id: "evidence", label: "Evidence", icon: FileText },
+    { id: "outcome", label: "Outcome", icon: AlertTriangle },
+    { id: "summary", label: "Summary", icon: FileText },
+  ];
+
+  const currentStepIndex = steps.findIndex((s) => s.id === step);
+
+  const handleNext = () => {
+    const idx = currentStepIndex;
+    if (idx < steps.length - 1) {
+      setStep(steps[idx + 1].id);
+    }
+  };
+
+  const handleBack = () => {
+    const idx = currentStepIndex;
+    if (idx > 0) {
+      setStep(steps[idx - 1].id);
+    }
+  };
+
+  const addWitness = () => {
+    if (newWitness.trim()) {
+      setWitnesses([...witnesses, newWitness.trim()]);
+      setNewWitness("");
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await new Promise((r) => setTimeout(r, 1500));
+    setSaving(false);
+    setStep("summary");
+  };
+
+  const questions = interviewTemplates[incidentType] || interviewTemplates.tardiness;
+
+  const renderPrepare = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Pre-Interview Checklist</h3>
+        <p className="text-sm text-text-secondary">Ensure all documents are prepared before starting.</p>
+      </div>
+
+      <div className="space-y-4">
+        {[
+          { label: "Incident report reviewed", done: true },
+          { label: "Employee file accessed", done: true },
+          { label: "Policy document prepared", done: false },
+          { label: "Witness statements collected", done: false },
+          { label: "HR representative confirmed", done: true },
+        ].map((item, i) => (
+          <div key={i} className="flex items-center justify-between rounded-lg border border-border p-4">
+            <div className="flex items-center gap-3">
+              {item.done ? (
+                <CheckCircle className="h-5 w-5 text-brand-success" />
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-border" />
+              )}
+              <span className={item.done ? "text-text-secondary" : "text-text-primary"}>{item.label}</span>
+            </div>
+            {item.done ? (
+              <Badge variant="success">Complete</Badge>
+            ) : (
+              <Badge variant="warning">Pending</Badge>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-text-primary">Employee Name</label>
+          <Input
+            value={employeeName}
+            onChange={(e) => setEmployeeName(e.target.value)}
+            placeholder="Enter employee name"
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-text-primary">Incident Reference</label>
+          <Input
+            value={incidentRef}
+            onChange={(e) => setIncidentRef(e.target.value)}
+            placeholder="INC-XXXX-XXXX"
+            className="mt-1"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-text-primary">Interview Type</label>
+          <select
+            value={incidentType}
+            onChange={(e) => setIncidentType(e.target.value)}
+            className="mt-1 w-full rounded-md border border-border bg-brand-slate-dark px-3 py-2 text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+          >
+            <option value="tardiness">Tardiness</option>
+            <option value="misconduct">Misconduct</option>
+            <option value="performance">Performance Issue</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderQuestions = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Interview Questions</h3>
+        <p className="text-sm text-text-secondary">Ask each question and record the response.</p>
+      </div>
+
+      <div className="space-y-4">
+        {questions.map((q, i) => (
+          <Card key={q.id} className="p-4">
+            <div className="mb-3 flex items-start gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-primary text-xs font-semibold text-text-inverse">
+                {i + 1}
+              </span>
+              <p className="flex-1 text-sm font-medium text-text-primary">{q.text}</p>
+              {q.required && <span className="text-brand-error">*</span>}
+            </div>
+
+            {q.type === "text" && (
+              <Textarea
+                value={answers[q.id] || ""}
+                onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                placeholder="Record response..."
+                className="min-h-[80px]"
+              />
+            )}
+
+            {q.type === "yes_no" && (
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setAnswers({ ...answers, [q.id]: "yes" })}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 ${
+                    answers[q.id] === "yes"
+                      ? "bg-brand-success text-text-inverse"
+                      : "bg-brand-slate-light text-text-secondary hover:bg-card-hover"
+                  }`}
+                >
+                  <CheckCircle className="h-4 w-4" /> Yes
+                </button>
+                <button
+                  onClick={() => setAnswers({ ...answers, [q.id]: "no" })}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 ${
+                    answers[q.id] === "no"
+                      ? "bg-brand-error text-text-inverse"
+                      : "bg-brand-slate-light text-text-secondary hover:bg-card-hover"
+                  }`}
+                >
+                  <XCircle className="h-4 w-4" /> No
+                </button>
+              </div>
+            )}
+
+            {q.type === "scale" && (
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setAnswers({ ...answers, [q.id]: String(n) })}
+                    className={`h-8 w-8 rounded-full text-sm font-medium ${
+                      answers[q.id] === String(n)
+                        ? "bg-brand-primary text-text-inverse"
+                        : "bg-brand-slate-light text-text-secondary hover:bg-card-hover"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-text-primary">Additional Notes</label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Any additional observations..."
+          className="mt-1"
+        />
+      </div>
+    </div>
+  );
+
+  const renderEvidence = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Evidence & Witnesses</h3>
+        <p className="text-sm text-text-secondary">Upload supporting documents and record witnesses.</p>
+      </div>
+
+      <Card className="p-4 border-dashed border-2">
+        <div className="flex flex-col items-center justify-center py-8">
+          <Upload className="h-12 w-12 text-text-tertiary" />
+          <p className="mt-2 text-sm text-text-secondary">Drop files here or click to upload</p>
+          <p className="text-xs text-text-tertiary">PDF, PNG, JPG up to 10MB</p>
+          <Button variant="outline" className="mt-4">
+            Choose Files
+          </Button>
+        </div>
+      </Card>
+
+      <div>
+        <label className="block text-sm font-medium text-text-primary">Witnesses</label>
+        <div className="mt-2 flex gap-2">
+          <Input
+            value={newWitness}
+            onChange={(e) => setNewWitness(e.target.value)}
+            placeholder="Witness name"
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addWitness())}
+          />
+          <Button onClick={addWitness} variant="outline">
+            Add
+          </Button>
+        </div>
+        {witnesses.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {witnesses.map((w, i) => (
+              <Badge key={i} variant="outline" className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {w}
+                <button onClick={() => setWitnesses(witnesses.filter((_, idx) => idx !== i))} className="ml-1">
+                  ├ù
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderOutcome = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Interview Outcome</h3>
+        <p className="text-sm text-text-secondary">Select the appropriate action based on the interview.</p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[
+          { value: "verbal_warning", label: "Verbal Warning", description: "Coach employee with verbal warning" },
+          { value: "written_warning", label: "Written Warning", description: "Issue formal written warning" },
+          { value: "pip", label: "Performance Improvement Plan", description: "Initiate 60-day PIP" },
+          { value: "termination_review", label: "Termination Review", description: "Escalate to legal for termination" },
+          { value: "no_action", label: "No Action Needed", description: "Close with no disciplinary action" },
+          { value: "further_investigation", label: "Further Investigation", description: "Requires additional review" },
+        ].map((option) => (
+          <Card
+            key={option.value}
+            className={`cursor-pointer p-4 transition-colors ${
+              outcome === option.value
+                ? "border-brand-primary bg-brand-primary/5"
+                : "hover:bg-card-hover"
+            }`}
+            onClick={() => setOutcome(option.value)}
+          >
+            <p className="font-medium text-text-primary">{option.label}</p>
+            <p className="mt-1 text-xs text-text-tertiary">{option.description}</p>
+          </Card>
+        ))}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-text-primary">Action Plan (required)</label>
+        <Textarea
+          value={actionPlan}
+          onChange={(e) => setActionPlan(e.target.value)}
+          placeholder="Detail the specific actions, timeline, and follow-up steps..."
+          className="mt-1 min-h-[120px]"
+        />
+      </div>
+    </div>
+  );
+
+  const renderSummary = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-success/10">
+          <CheckCircle className="h-8 w-8 text-brand-success" />
+        </div>
+      </div>
+
+      <div className="text-center">
+        <h2 className="font-display text-2xl font-bold text-text-primary">Interview Complete</h2>
+        <p className="mt-2 text-text-secondary">The interview has been recorded and saved.</p>
+      </div>
+
+      <Card className="p-6">
+        <h3 className="mb-4 font-display text-lg font-semibold text-text-primary">Summary</h3>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between border-b border-border pb-2">
+            <span className="text-text-tertiary">Employee</span>
+            <span className="font-medium text-text-primary">{employeeName || "Not specified"}</span>
+          </div>
+          <div className="flex justify-between border-b border-border pb-2">
+            <span className="text-text-tertiary">Incident</span>
+            <span className="font-medium text-text-primary">{incidentRef || "Not specified"}</span>
+          </div>
+          <div className="flex justify-between border-b border-border pb-2">
+            <span className="text-text-tertiary">Type</span>
+            <span className="font-medium text-text-primary capitalize">{incidentType}</span>
+          </div>
+          <div className="flex justify-between border-b border-border pb-2">
+            <span className="text-text-tertiary">Outcome</span>
+            <span className="font-medium text-text-primary capitalize">{outcome.replace(/_/g, " ")}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-tertiary">Witnesses</span>
+            <span className="font-medium text-text-primary">{witnesses.length > 0 ? witnesses.join(", ") : "None"}</span>
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex justify-center gap-3">
+        <Button variant="outline" onClick={() => window.print()}>
+          Print Summary
+        </Button>
+        <Button asChild>
+          <a href="/incident-queue">Back to Queue</a>
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <PageContainer
-      title="Coach Interview"
-      description="Guide a manager through a verbal-warning interview with empathy, documentation, and escalation safeguards."
+      title="Conduct Interview"
+      description="HR-guided disciplinary interview workflow."
     >
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-5">
-          <Card className="border-blue-400/20 bg-gradient-to-br from-blue-950/30 via-slate-900 to-violet-950/20 p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-400/15 text-blue-200">
-                  <MessagesSquare className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-text-primary">
-                    Manager coaching session
-                  </h2>
-                  <p className="mt-1 max-w-2xl text-sm text-text-secondary">
-                    This path is for lower-risk verbal warnings. Any high-risk terms route the case to HR before delivery.
-                  </p>
-                </div>
-              </div>
-              <Badge variant={riskTerms.length > 0 ? "warning" : "success"}>
-                {riskTerms.length > 0 ? "HR review required" : "Verbal path"}
-              </Badge>
-            </div>
-          </Card>
-
-          <div className="grid gap-2 sm:grid-cols-5">
-            {STEPS.map((step, index) => {
-              const active = index === currentIndex;
-              const done = notes[step.id].trim().length > 0;
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => setCurrentIndex(index)}
-                  className={
-                    "min-h-[70px] rounded-lg border p-3 text-left transition-colors " +
-                    (active
-                      ? "border-blue-300 bg-blue-400/10"
-                      : done
-                        ? "border-emerald-400/30 bg-emerald-400/5 hover:bg-emerald-400/10"
-                        : "border-border hover:bg-card-hover")
-                  }
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-text-tertiary">
-                      Step {index + 1}
-                    </span>
-                    {done && <CheckCircle2 className="h-4 w-4 text-emerald-300" />}
+      {step === "summary" ? (
+        renderSummary()
+      ) : (
+        <>
+          {/* Step Indicator */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              {steps.map((s, i) => {
+                const Icon = s.icon;
+                const isActive = s.id === step;
+                const isCompleted = i < currentStepIndex;
+                return (
+                  <div key={s.id} className="flex items-center">
+                    <div className={`flex items-center gap-2 ${isActive ? "text-brand-primary" : isCompleted ? "text-brand-success" : "text-text-tertiary"}`}>
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                        isCompleted ? "bg-brand-success text-text-inverse" : isActive ? "bg-brand-primary text-text-inverse" : "bg-brand-slate-light"
+                      }`}>
+                        {isCompleted ? <CheckCircle className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                      </div>
+                      <span className="hidden text-sm font-medium sm:block">{s.label}</span>
+                    </div>
+                    {i < steps.length - 1 && (
+                      <div className={`mx-2 h-0.5 w-8 sm:w-16 ${isCompleted ? "bg-brand-success" : "bg-brand-slate-light"}`} />
+                    )}
                   </div>
-                  <p className="mt-1 text-sm font-semibold text-text-primary">{step.title}</p>
-                </button>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <Card className="p-5">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase text-blue-200">
-                  Step {currentIndex + 1} of {STEPS.length}
-                </p>
-                <h3 className="mt-1 text-xl font-semibold text-text-primary">
-                  {currentStep.title}
-                </h3>
-              </div>
-              <Badge variant="outline">{completeCount}/{STEPS.length} documented</Badge>
-            </div>
+          {/* Step Content */}
+          <Card className="p-6">
+            {step === "prepare" && renderPrepare()}
+            {step === "questions" && renderQuestions()}
+            {step === "evidence" && renderEvidence()}
+            {step === "outcome" && renderOutcome()}
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-              <div>
-                <p className="mb-2 text-sm text-text-secondary">{currentStep.prompt}</p>
-                <Textarea
-                  value={notes[currentStep.id]}
-                  onChange={(event) =>
-                    setNotes((prev) => ({ ...prev, [currentStep.id]: event.target.value }))
-                  }
-                  placeholder="Capture the manager's notes here..."
-                  className="min-h-[250px]"
-                  maxLength={2500}
-                />
-                <p className="mt-2 text-right text-xs text-text-tertiary">
-                  {notes[currentStep.id].length}/2500
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="rounded-lg border border-blue-400/20 bg-blue-400/5 p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-blue-100">
-                    <HeartHandshake className="h-4 w-4" />
-                    Coaching
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-text-secondary">
-                    {currentStep.coaching}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-border p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                    <BookOpenCheck className="h-4 w-4 text-violet-200" />
-                    Document
-                  </div>
-                  <ul className="mt-2 space-y-1">
-                    {currentStep.documentation.map((item) => (
-                      <li key={item} className="text-xs text-text-secondary">
-                        - {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+            {/* Navigation */}
+            <div className="mt-6 flex justify-between">
               <Button
-                variant="ghost"
-                onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
-                disabled={currentIndex === 0}
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStepIndex === 0}
               >
-                <ArrowLeft className="mr-2 h-4 w-4" />
+                <ChevronLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button
-                onClick={() =>
-                  setCurrentIndex((index) => Math.min(STEPS.length - 1, index + 1))
-                }
-                disabled={currentIndex === STEPS.length - 1}
-              >
-                Next
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-blue-200" />
-              <h3 className="text-sm font-semibold text-text-primary">Routing guardrails</h3>
-            </div>
-            {riskTerms.length > 0 ? (
-              <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-amber-200">
-                  <AlertTriangle className="h-4 w-4" />
-                  Escalate to HR
-                </div>
-                <p className="mt-2 text-xs text-text-secondary">
-                  Detected: {riskTerms.join(", ")}. This should leave the verbal-warning path.
-                </p>
+              <div className="flex gap-2">
+                {step === "outcome" ? (
+                  <Button onClick={handleSave} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Save & Complete
+                  </Button>
+                ) : (
+                  <Button onClick={handleNext}>
+                    Next
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
-            ) : (
-              <p className="mt-3 text-sm text-text-secondary">
-                No high-risk terms detected. This can remain a manager coaching record unless new facts change the risk level.
-              </p>
-            )}
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-violet-200" />
-              <h3 className="text-sm font-semibold text-text-primary">Documentation summary</h3>
-            </div>
-            <div className="mt-3 space-y-3">
-              {summary.map((item) => (
-                <div key={item.label} className="rounded-lg border border-border p-3">
-                  <p className="text-xs font-semibold text-text-tertiary">{item.label}</p>
-                  <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-text-secondary">
-                    {item.value}
-                  </p>
-                </div>
-              ))}
             </div>
           </Card>
-
-          <Card className="p-4">
-            <h3 className="text-sm font-semibold text-text-primary">Suggested outcome</h3>
-            <p className="mt-2 text-sm text-text-secondary">
-              {riskTerms.length > 0
-                ? "Pause manager delivery and send this record to HR for review."
-                : isComplete
-                  ? "Ready to save as verbal-warning coaching documentation."
-                  : "Complete each interview step before saving the coaching record."}
-            </p>
-          </Card>
-        </div>
-      </div>
+        </>
+      )}
     </PageContainer>
   );
 }

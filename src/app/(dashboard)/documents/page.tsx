@@ -1,5 +1,5 @@
 /**
- * Employee Portal — Pending & Signed Documents
+ * Employee Portal ΓÇö Pending & Signed Documents
  *
  * Card-based list of pending documents (with CTA to sign)
  * and signed documents (with checkmarks).
@@ -15,16 +15,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileText, CheckCircle, Clock, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-
-interface EmployeeDocument {
-  id: string;
-  title: string;
-  type: string;
-  status: "pending_signature" | "signed" | "disputed";
-  reference: string;
-  createdAt: string;
-  signedAt: string | null;
-}
+import { disciplinaryAPI } from "@/lib/api/client";
 
 export default function EmployeeDocumentsPage() {
   const breadcrumbs = usePageBreadcrumbs([
@@ -32,17 +23,17 @@ export default function EmployeeDocumentsPage() {
     { label: "My Documents" },
   ]);
 
-  const [docs, setDocs] = useState<EmployeeDocument[]>([]);
+  const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     async function loadDocs() {
       try {
-        const res = await fetch("/api/v1/users/me/documents");
-        if (!res.ok) throw new Error(`Failed with status ${res.status}`);
-        const json = (await res.json()) as { documents: EmployeeDocument[] };
-        if (active) setDocs(json.documents);
+        const res = await disciplinaryAPI.list(undefined, undefined, 50);
+        if (active && res.actions) {
+          setDocs(res.actions);
+        }
       } catch (err) {
         console.error("Failed to load documents", err);
       } finally {
@@ -58,7 +49,7 @@ export default function EmployeeDocumentsPage() {
     [docs],
   );
   const signedDocs = useMemo(
-    () => docs.filter((d) => d.status === "signed"),
+    () => docs.filter((d) => d.status === "completed" || d.status === "signed"),
     [docs],
   );
   const disputedDocs = useMemo(
@@ -146,7 +137,7 @@ function DocumentCard({
   isSigned,
   isDisputed,
 }: {
-  doc: EmployeeDocument;
+  doc: any;
   isSigned?: boolean;
   isDisputed?: boolean;
 }) {
@@ -154,9 +145,9 @@ function DocumentCard({
     <Card className="p-4 transition-colors hover:bg-card-hover">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-sm font-medium text-text-primary">{doc.title}</h3>
+          <h3 className="text-sm font-medium text-text-primary">{doc.action_type || "Document"}</h3>
           <p className="mt-0.5 text-xs text-text-tertiary">
-            {doc.reference} • {doc.type}
+            {doc.incident_id ? "INC-" + doc.incident_id.slice(0, 4) : "Unreferenced"}
           </p>
         </div>
         {!isSigned && !isDisputed ? (
@@ -172,7 +163,7 @@ function DocumentCard({
         {isSigned ? (
           <span className="flex items-center gap-1 text-brand-success">
             <CheckCircle className="h-3 w-3" />
-            Completed: {doc.signedAt ? new Date(doc.signedAt).toLocaleDateString() : "Signed"}
+            Completed: {new Date(doc.updated_at).toLocaleDateString()}
           </span>
         ) : isDisputed ? (
           <span className="flex items-center gap-1 text-brand-error">
@@ -182,14 +173,14 @@ function DocumentCard({
         ) : (
           <span className="flex items-center gap-1 text-brand-warning">
             <Clock className="h-3 w-3" />
-            Created: {new Date(doc.createdAt).toLocaleDateString()}
+            Created: {new Date(doc.created_at).toLocaleDateString()}
           </span>
         )}
       </div>
 
       <div className="mt-4 flex gap-2">
         <Button asChild size="sm" variant={isSigned || isDisputed ? "outline" : "default"}>
-          <Link href={`/documents/${doc.id}/sign`}>
+          <Link href={isSigned || isDisputed ? `/documents/${doc.id}/view` : `/documents/${doc.id}/sign`}>
             {isSigned || isDisputed ? "View Details" : "Sign Document"}
             {(!isSigned && !isDisputed) && <ArrowRight className="ml-2 h-4 w-4" />}
           </Link>
