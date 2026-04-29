@@ -370,10 +370,31 @@ export async function updateIncidentStatus(
     .single();
 
   if (updateError) {
-    throw new Error(`Failed to update incident status: ${updateError.message}`);
+    throw new Error(`Failed to update incident: ${updateError.message}`);
   }
 
-  return mapToResponse(data);
+  // 4. Fire-and-forget email notifications for relevant transitions
+  const fromStatus = current.status as string;
+  const updatedIncident = mapToResponse(data);
+
+  const { data: recipients } = await supabase
+    .from("users")
+    .select("id, email, role")
+    .eq("company_id", companyId)
+    .in("role", ["hr_agent", "company_admin", "manager"])
+    .eq("status", "active");
+
+  if (recipients && recipients.length > 0) {
+    notifyIncidentStateTransition({
+      companyId,
+      incident: updatedIncident,
+      fromStatus,
+      toStatus: newStatus,
+      recipients,
+    }).catch((err) => console.error("[updateIncidentStatus] notifyIncidentStateTransition failed:", err));
+  }
+
+  return updatedIncident;
 }
 
 // ---------------------------------------------------------------------------
@@ -444,4 +465,131 @@ function mapToResponse(
     updated_at: data.updated_at as string,
     witnesses: witnessIds ?? [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Email notifications
+// ---------------------------------------------------------------------------
+
+export async function notifyIncidentStateTransition(params: {
+  companyId: string;
+  incident: IncidentResponse;
+  fromStatus: string;
+  toStatus: string;
+  recipients: Array<{ id: string; email: string; role: string }>;
+}): Promise<void> {
+  const { companyId, incident, fromStatus, toStatus, recipients } = params;
+  const supabase = createAdminClient();
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const dashboardUrl = `${siteUrl}/incident-queue/${incident.id}`;
+  const signUrl = `${siteUrl}/documents/${incident.id}/sign`;
+
+  const { data: company } = await supabase
+    .from("companies")
+    .select("name")
+    .eq("id", companyId)
+    .single();
+
+  const companyName = company?.name ?? "Your Organization";
+
+  const { data: employee } = await supabase
+    .from("users")
+    .select("first_name, last_name")
+    .eq("id", incident.employee_id)
+    .single();
+
+  const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : "Unknown";
+
+  const { sendIncidentReportedEmail, sendAIEvaluationCompleteEmail, sendDocumentAwaitingSignatureEmail, sendDocumentSignedEmail, sendMeetingScheduledEmail, sendDisputeSubmittedEmail } = await import("./email");
+
+  const hrEmails = recipients.filter((r) => r.role === "hr_agent" || r.role === "company_admin").map((r) => r.email);
+  const managerEmails = recipients.filter((r) => r.role === "manager").map((r) => r.email);
+
+  switch (toStatus) {
+    case "pending_hr_review":
+      if (hrEmails.length > 0) {
+        sendIncidentReportedEmail({
+          to: hrEmails,
+          companyName,
+          incidentRef: incident.reference_number,
+          employeeName: employeeName,
+          severity: incident.severity,
+          summary: incident.description.slice(0, 200),
+          dashboardUrl,
+        }).catch((err) => console.error("[notify] sendIncidentReportedEmail failed:", err));
+      }
+      break;
+
+    case "ai_evaluated":
+      if (hrEmails.length > 0 && incident.ai_recommendation) {
+        const rec = incident.ai_recommendation as Record<string, unknown>;
+        sendAIEvaluationCompleteEmail({
+          to: hrEmails,
+          companyName,
+          incidentRef: incident.reference_number,
+          employeeName: employeeName,
+          confidence: incident.ai_confidence_score ?? 0,
+          recommendedAction: String(rec.action ?? "Unknown"),
+          dashboardUrl,
+        }).catch((err) => console.error("[notify] sendAIEvaluationCompleteEmail failed:", err));
+      }
+      break;
+
+    case "pending_signature":
+      const employeeRec = recipients.find((r) => r.id === incident.employee_id);
+      if (employeeRec) {
+        sendDocumentAwaitingSignatureEmail({
+          to: employeeRec.email,
+          companyName,
+          employeeName: employeeName,
+          incidentRef: incident.reference_number,
+          documentTitle: "Disciplinary Document",
+          signUrl,
+          deadlineHours: 72,
+        }).catch((err) => console.error("[notify] sendDocumentAwaitingSignatureEmail failed:", err));
+      }
+      break;
+
+    case "signed":
+      if (hrEmails.length > 0) {
+        sendDocumentSignedEmail({
+          to: hrEmails,
+          companyName,
+          employeeName: employeeName,
+          incidentRef: incident.reference_number,
+          documentTitle: "Disciplinary Document",
+          dashboardUrl,
+        }).catch((err) => console.error("[notify] sendDocumentSignedEmail failed:", err));
+      }
+      break;
+
+    case "meeting_scheduled":
+      if (managerEmails.length > 0) {
+        sendMeetingScheduledEmail({
+          to: managerEmails,
+          companyName,
+          employeeName: employeeName,
+          managerName: "Manager",
+          incidentRef: incident.reference_number,
+          meetingDate: "Soon",
+          meetingTime: "TBD",
+          meetingLocation: "TBD",
+          dashboardUrl,
+        }).catch((err) => console.error("[notify] sendMeetingScheduledEmail failed:", err));
+      }
+      break;
+
+    case "disputed":
+      if (hrEmails.length > 0) {
+        sendDisputeSubmittedEmail({
+          to: hrEmails,
+          companyName,
+          employeeName: employeeName,
+          incidentRef: incident.reference_number,
+          dashboardUrl,
+        }).catch((err) => console.error("[notify] sendDisputeSubmittedEmail failed:", err));
+      }
+      break;
+  }
 }

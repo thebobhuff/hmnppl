@@ -72,7 +72,7 @@ export default function EmployeesPage() {
     return () => { active = false; };
   }, []);
 
-  const employees = users.filter((u) => u.role === "EMPLOYEE" || u.role === "MANAGER");
+  const employees = users.filter((u) => u.role === "employee" || u.role === "manager");
 
   const riskMap = useMemo(() => {
     const map = new Map<string, EmployeeRisk>();

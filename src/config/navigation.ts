@@ -44,6 +44,12 @@ const COMPANY_ADMIN_NAV: NavItem[] = [
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
   { key: "org-health", label: "Org Health", href: "/org-health", iconName: "Activity" },
   {
+    key: "audit-log",
+    label: "Audit Log",
+    href: "/audit-log",
+    iconName: "ScrollText",
+  },
+  {
     key: "training-gaps",
     label: "Training Gaps",
     href: "/training-gaps",
@@ -77,6 +83,12 @@ const HR_AGENT_NAV: NavItem[] = [
   { key: "policies", label: "Policies", href: "/policies", iconName: "FileText" },
   { key: "org-health", label: "Org Health", href: "/org-health", iconName: "Activity" },
   {
+    key: "audit-log",
+    label: "Audit Log",
+    href: "/audit-log",
+    iconName: "ScrollText",
+  },
+  {
     key: "training-gaps",
     label: "Training Gaps",
     href: "/training-gaps",
@@ -102,6 +114,18 @@ const MANAGER_NAV: NavItem[] = [
     isCta: true,
   },
   {
+    key: "meetings",
+    label: "Meetings",
+    href: "/meetings",
+    iconName: "Calendar",
+  },
+  {
+    key: "org-health",
+    label: "Org Health",
+    href: "/org-health",
+    iconName: "Activity",
+  },
+  {
     key: "conduct-interview",
     label: "Coach Interview",
     href: "/conduct-interview",
@@ -116,6 +140,12 @@ const EMPLOYEE_NAV: NavItem[] = [
     label: "My Documents",
     href: "/documents",
     iconName: "FileText",
+  },
+  {
+    key: "meetings",
+    label: "My Meetings",
+    href: "/meetings",
+    iconName: "Calendar",
   },
   { key: "my-profile", label: "My Profile", href: "/profile", iconName: "UserCircle" },
 ];
