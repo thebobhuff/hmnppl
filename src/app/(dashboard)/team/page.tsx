@@ -16,9 +16,12 @@ import { Select } from "@/components/ui/select";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { APIErrorFallback } from "@/components/domain/ErrorBoundary";
-import { usersAPI, type UserResponse, type APIError } from "@/lib/api/client";
+import { BulkUploadModal } from "@/components/domain/BulkUploadModal";
+import { OrgChart, OrgChartSkeleton } from "@/components/domain/OrgChart";
+import { usersAPI, hrAPI, type UserResponse, type APIError, type OrgChartNode, type OrgChartStats } from "@/lib/api/client";
 import {
   Users,
   UserPlus,
@@ -29,6 +32,8 @@ import {
   Clock,
   MoreHorizontal,
   Loader2,
+  Upload,
+  Network,
 } from "lucide-react";
 
 const ROLE_OPTIONS = [
@@ -51,8 +56,12 @@ export default function TeamPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"list" | "org">("list");
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orgLoading, setOrgLoading] = useState(false);
+  const [orgChart, setOrgChart] = useState<{ tree: OrgChartNode[]; stats: OrgChartStats } | null>(null);
   const [error, setError] = useState<APIError | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const { toast } = useToast();
@@ -78,9 +87,27 @@ export default function TeamPage() {
     }
   }, [roleFilter, statusFilter]);
 
+  const fetchOrgChart = useCallback(async () => {
+    setOrgLoading(true);
+    try {
+      const result = await hrAPI.getOrgChart();
+      setOrgChart(result);
+    } catch (err) {
+      console.error("Failed to load org chart:", err);
+    } finally {
+      setOrgLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    if (activeTab === "org" && !orgChart) {
+      void fetchOrgChart();
+    }
+  }, [activeTab, orgChart, fetchOrgChart]);
 
   const filteredUsers = useMemo(() => {
     if (!search) return users;
@@ -151,10 +178,20 @@ export default function TeamPage() {
       title="Team"
       description="Manage employees, roles, and invitations."
       actions={
-        <Button size="sm" onClick={() => setInviteModalOpen(true)}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Invite Member
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBulkUploadOpen(true)}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Bulk Upload
+          </Button>
+          <Button size="sm" onClick={() => setInviteModalOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Invite Member
+          </Button>
+        </div>
       }
     >
       <div className="grid gap-6">
@@ -186,68 +223,93 @@ export default function TeamPage() {
           />
         </div>
 
-        {/* Filters */}
-        <Card className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or email..."
-                className="pl-9"
-              />
-            </div>
-            <Select
-              value={roleFilter}
-              onValueChange={(v) => setRoleFilter(v)}
-              placeholder="Filter by role..."
-              options={ROLE_OPTIONS}
-              className="w-full sm:w-40"
-            />
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v)}
-              placeholder="Filter by status..."
-              options={STATUS_OPTIONS}
-              className="w-full sm:w-40"
-            />
-          </div>
-        </Card>
+        <div className="flex items-center justify-between gap-4">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "list" | "org")}>
+            <TabsList>
+              <TabsTrigger value="list">
+                <Users className="mr-2 h-4 w-4" />
+                Team List
+              </TabsTrigger>
+              <TabsTrigger value="org">
+                <Network className="mr-2 h-4 w-4" />
+                Org Chart
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-        {/* Error State */}
-        {error && (
-          <APIErrorFallback
-            error={error}
-            retry={fetchUsers}
-            message="Failed to load team members."
-          />
-        )}
-
-        {/* Loading State */}
-        {loading && !error && (
+        {activeTab === "org" && (
           <Card className="p-4">
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-14 w-full" />
-              ))}
-            </div>
+            {orgLoading ? (
+              <OrgChartSkeleton />
+            ) : orgChart ? (
+              <OrgChart tree={orgChart.tree} stats={orgChart.stats} />
+            ) : (
+              <OrgChartSkeleton />
+            )}
           </Card>
         )}
 
-        {/* User Table */}
-        {!loading && !error && filteredUsers.length === 0 && (
-          <Card className="p-6">
-            <EmptyState
-              title="No team members found"
-              description="Try adjusting your filters or invite a new member."
-              icon={<Users className="h-8 w-8" />}
-            />
-          </Card>
-        )}
+        {activeTab === "list" && (
+          <>
+            <Card className="p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  value={roleFilter}
+                  onValueChange={(v) => setRoleFilter(v)}
+                  placeholder="Filter by role..."
+                  options={ROLE_OPTIONS}
+                  className="w-full sm:w-40"
+                />
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v)}
+                  placeholder="Filter by status..."
+                  options={STATUS_OPTIONS}
+                  className="w-full sm:w-40"
+                />
+              </div>
+            </Card>
 
-        {!loading && !error && filteredUsers.length > 0 && (
-          <Card className="overflow-hidden">
+            {error && (
+              <APIErrorFallback
+                error={error}
+                retry={fetchUsers}
+                message="Failed to load team members."
+              />
+            )}
+
+            {loading && !error && (
+              <Card className="p-4">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {!loading && !error && filteredUsers.length === 0 && (
+              <Card className="p-6">
+                <EmptyState
+                  title="No team members found"
+                  description="Try adjusting your filters or invite a new member."
+                  icon={<Users className="h-8 w-8" />}
+                />
+              </Card>
+            )}
+
+            {!loading && !error && filteredUsers.length > 0 && (
+              <Card className="overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -329,6 +391,8 @@ export default function TeamPage() {
             </div>
           </Card>
         )}
+        </>
+        )}
       </div>
 
       {/* Invite Modal */}
@@ -337,6 +401,12 @@ export default function TeamPage() {
         onOpenChange={setInviteModalOpen}
         onInvite={handleInvite}
         loading={inviteLoading}
+      />
+
+      <BulkUploadModal
+        open={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        onSuccess={fetchUsers}
       />
     </PageContainer>
   );

@@ -6,14 +6,18 @@
 
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { incidentsAPI, disciplinaryAPI, usersAPI, type IncidentResponse } from "@/lib/api/client";
 import {
   Activity, AlertTriangle, ArrowDown, ArrowUp, Clock,
-  Loader2, TrendingDown, TrendingUp, Users, UserMinus, UserPlus,
+  Download, Loader2, TrendingDown, TrendingUp, Users, UserMinus, UserPlus,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
 
 export default function HRKPIsPage() {
   const breadcrumbs = useMemo(() => [{ label: "Home", href: "/dashboard" }, { label: "HR KPIs" }], []);
@@ -39,7 +43,7 @@ export default function HRKPIsPage() {
   }, []);
 
   // Derived KPIs
-  const totalEmployees = users.filter(u => u.role === "EMPLOYEE").length || users.length;
+  const totalEmployees = users.filter(u => u.role === "employee").length || users.length;
   const totalIncidents = incidents.length;
   const openCases = incidents.filter(i => !["approved", "rejected", "resolved", "closed", "signed"].includes(i.status || "")).length;
 
@@ -89,6 +93,29 @@ export default function HRKPIsPage() {
     });
     return buckets;
   }, [users]);
+
+  // Monthly incident trend (last 12 months)
+  const monthlyTrend = useMemo(() => {
+    const now = new Date();
+    const months: Array<{ month: string; incidents: number; high: number; critical: number }> = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
+      const monthIncidents = incidents.filter((inc) => {
+        const created = inc.created_at ?? "";
+        return created >= start && created < end;
+      });
+      months.push({
+        month: label,
+        incidents: monthIncidents.length,
+        high: monthIncidents.filter((i) => i.severity === "high").length,
+        critical: monthIncidents.filter((i) => i.severity === "critical").length,
+      });
+    }
+    return months;
+  }, [incidents]);
 
   const maxTenure = Math.max(...Object.values(tenureData), 1);
 
@@ -161,7 +188,56 @@ export default function HRKPIsPage() {
         </Card>
       </div>
 
-      {/* Alerts */}
+      {/* Time-series incident trend */}
+      <Card className="p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-base font-semibold text-text-primary">Incident Trend (Last 12 Months)</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const rows = [["Month", "Incidents", "High Severity", "Critical Severity"]];
+              monthlyTrend.forEach(m => {
+                rows.push([m.month, String(m.incidents), String(m.high), String(m.critical)]);
+              });
+              const csv = rows.map(r => r.join(",")).join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = `incident-trend-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="mr-1.5 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={monthlyTrend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="var(--color-text-tertiary)" />
+              <YAxis tick={{ fontSize: 11 }} stroke="var(--color-text-tertiary)" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: 12,
+                }}
+              />
+              <Line type="monotone" dataKey="incidents" stroke="#2563eb" strokeWidth={2} dot={false} name="Total" />
+              <Line type="monotone" dataKey="high" stroke="#ea580c" strokeWidth={2} dot={false} name="High" />
+              <Line type="monotone" dataKey="critical" stroke="#dc2626" strokeWidth={2} dot={false} name="Critical" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-2 flex items-center gap-4">
+          <span className="flex items-center gap-1.5 text-xs text-text-secondary"><span className="h-2 w-2 rounded-full bg-blue-600" />Total</span>
+          <span className="flex items-center gap-1.5 text-xs text-text-secondary"><span className="h-2 w-2 rounded-full bg-orange-500" />High</span>
+          <span className="flex items-center gap-1.5 text-xs text-text-secondary"><span className="h-2 w-2 rounded-full bg-red-600" />Critical</span>
+        </div>
+      </Card>
       {severityWeight > 30 && (
         <Card className="border-amber-500/30 bg-amber-500/5 p-4">
           <div className="flex items-start gap-3">

@@ -154,6 +154,8 @@ export const incidentResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   witnesses: z.array(z.string().uuid()).optional(),
+  employee_name: z.string().optional(),
+  reporter_name: z.string().optional(),
 });
 
 export type IncidentResponse = z.infer<typeof incidentResponseSchema>;
