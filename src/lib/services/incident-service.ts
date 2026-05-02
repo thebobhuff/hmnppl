@@ -95,7 +95,7 @@ export async function createIncident(
   // 3. Capture policy snapshot (all active policies for this company)
   const { data: activePolicies } = await supabase
     .from("policies")
-    .select("id, title, category, rules, severity_levels")
+    .select("id, title, category, summary, content, rules, severity_levels")
     .eq("company_id", companyId)
     .eq("is_active", true);
 

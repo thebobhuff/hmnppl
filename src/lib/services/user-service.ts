@@ -33,6 +33,14 @@ export interface TimelineEvent {
   entity_id: string;
 }
 
+export interface InviteUserProfile {
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
+  jobTitle?: string | null;
+  hireDate?: string | null;
+}
+
 export async function listUsers(
   companyId: string,
   filters?: { role?: string; department_id?: string; status?: string },
@@ -214,6 +222,7 @@ export async function inviteUser(
   siteUrl: string,
   departmentId?: string | null,
   managerId?: string | null,
+  profile?: InviteUserProfile,
 ): Promise<{ user: UserResponse; inviteLink: string; simulatedEmail: boolean }> {
   const supabase = createAdminClient();
 
@@ -232,7 +241,9 @@ export async function inviteUser(
   });
 
   if (linkError || !linkData?.properties?.action_link) {
-    throw new Error(`Failed to generate invite link: ${linkError?.message ?? "Unknown error"}`);
+    throw new Error(
+      `Failed to generate invite link: ${linkError?.message ?? "Unknown error"}`,
+    );
   }
 
   const { data, error } = await supabase
@@ -245,8 +256,11 @@ export async function inviteUser(
         role,
         department_id: departmentId ?? null,
         manager_id: managerId ?? null,
-        first_name: "",
-        last_name: "",
+        first_name: profile?.firstName?.trim() ?? "",
+        last_name: profile?.lastName?.trim() ?? "",
+        phone: profile?.phone?.trim() || null,
+        job_title: profile?.jobTitle?.trim() || null,
+        hire_date: profile?.hireDate ?? null,
         status: "invited",
       },
       { onConflict: "company_id,email" },

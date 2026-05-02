@@ -342,7 +342,7 @@ export interface BaselinePolicyInput {
   category: string;
   content: string;
   summary: string;
-  rules: PolicyRule[];
+  rules: Record<string, unknown>[];
   severity_levels: Record<string, unknown>;
 }
 
@@ -351,7 +351,8 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
     template_id: "attendance-punctuality",
     title: "Attendance & Punctuality Policy",
     category: "attendance",
-    summary: "Defines expectations for attendance, tardiness handling, and progressive discipline for attendance violations.",
+    summary:
+      "Defines expectations for attendance, tardiness handling, and progressive discipline for attendance violations.",
     content: `This policy establishes guidelines for employee attendance and addresses tardiness, unexcused absences, and patterns of attendance violations.\n\n**Expectations:**\n- Employees are expected to arrive on time and be prepared to begin work at their scheduled start time.\n- Repeated tardiness disrupts workflow and impacts team productivity.\n\n**Procedure:**\n1. First occurrence: Verbal warning documented in employee file.\n2. Second occurrence: Written warning with improvement plan.\n3. Third occurrence: Final written warning with 30-day performance improvement plan.\n4. Continued violations: Escalation to HR for further disciplinary action, up to and including termination.\n\n**Exceptions:**\n- Employees with documented medical conditions or emergencies may be exempt per applicable laws.\n- Employees should notify their manager as early as possible if they anticipate being late.`,
     rules: [
       {
@@ -361,7 +362,8 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "low",
         actionType: "verbal_warning",
         escalationLevel: 1,
-        description: "First tardiness incident within 90 days — verbal warning documented.",
+        description:
+          "First tardiness incident within 90 days — verbal warning documented.",
         conditions: { max_per_year: 1, window_days: 90 },
       },
       {
@@ -401,21 +403,29 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "high",
         actionType: "written_warning",
         escalationLevel: 3,
-        description: "Failure to report absence without notification — immediate written warning with mandatory meeting.",
+        description:
+          "Failure to report absence without notification — immediate written warning with mandatory meeting.",
         conditions: { max_per_year: 1, window_days: 365 },
       },
     ],
     severity_levels: {
       low: { description: "Minor迟到 (< 10 min)", actions: ["verbal_warning"] },
-      medium: { description: "Repeated tardiness or unexcused absence", actions: ["written_warning"] },
-      high: { description: "Pattern of violations or no-call/no-show", actions: ["pip", "termination_review"] },
+      medium: {
+        description: "Repeated tardiness or unexcused absence",
+        actions: ["written_warning"],
+      },
+      high: {
+        description: "Pattern of violations or no-call/no-show",
+        actions: ["pip", "termination_review"],
+      },
     },
   },
   {
     template_id: "workplace-conduct",
     title: "Workplace Conduct Policy",
     category: "conduct",
-    summary: "Establishes standards for professional behavior, addressing insubordination, harassment, and inappropriate workplace conduct.",
+    summary:
+      "Establishes standards for professional behavior, addressing insubordination, harassment, and inappropriate workplace conduct.",
     content: `This policy defines acceptable workplace behavior and outlines the disciplinary process for conduct violations.\n\n**Scope:**\n- All employees, contractors, and visitors.\n- Applies to work premises, company events, and official communications.\n\n**Prohibited Conduct:**\n- Harassment, bullying, or intimidation of any kind.\n- Insubordination or refusal to follow lawful management directives.\n- Discriminatory language or actions.\n- Disclosure of confidential information.\n- Workplace violence or threats.\n\n**Process:**\n1. Investigation: HR will investigate all complaints within 5 business days.\n2. Findings: If conduct is substantiated, appropriate disciplinary action will be taken based on severity.\n3. Appeals: Employees may appeal disciplinary decisions within 10 business days.`,
     rules: [
       {
@@ -425,7 +435,8 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "medium",
         actionType: "written_warning",
         escalationLevel: 2,
-        description: "First refusal to follow a direct supervisor instruction — written warning.",
+        description:
+          "First refusal to follow a direct supervisor instruction — written warning.",
         conditions: { max_per_year: 1, window_days: 180 },
       },
       {
@@ -445,7 +456,8 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "high",
         actionType: "written_warning",
         escalationLevel: 3,
-        description: "First substantiated verbal harassment incident — immediate written warning, mandatory training.",
+        description:
+          "First substantiated verbal harassment incident — immediate written warning, mandatory training.",
         conditions: { max_per_year: 1, window_days: 365 },
       },
       {
@@ -455,21 +467,29 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "low",
         actionType: "verbal_warning",
         escalationLevel: 1,
-        description: "Minor first-time policy violation (dress code, break policy, etc.) — verbal warning.",
+        description:
+          "Minor first-time policy violation (dress code, break policy, etc.) — verbal warning.",
         conditions: { max_per_year: 2, window_days: 90 },
       },
     ],
     severity_levels: {
       low: { description: "Minor policy breach", actions: ["verbal_warning"] },
-      medium: { description: "Insubordination or minor harassment", actions: ["written_warning"] },
-      high: { description: "Severe harassment, threats, or repeated violations", actions: ["pip", "termination_review"] },
+      medium: {
+        description: "Insubordination or minor harassment",
+        actions: ["written_warning"],
+      },
+      high: {
+        description: "Severe harassment, threats, or repeated violations",
+        actions: ["pip", "termination_review"],
+      },
     },
   },
   {
     template_id: "performance-management",
     title: "Performance Management Policy",
     category: "performance",
-    summary: "Covers performance expectations, PIP procedures, and progressive discipline for missed deliverables and quality standards.",
+    summary:
+      "Covers performance expectations, PIP procedures, and progressive discipline for missed deliverables and quality standards.",
     content: `This policy establishes the framework for managing employee performance issues through progressive discipline.\n\n**Performance Standards:**\n- Employees are expected to meet defined productivity and quality benchmarks.\n- Managers must provide clear expectations and regular feedback.\n- Performance issues should be documented at each stage.\n\n**Progressive Discipline:**\n1. Verbal Warning: Documented conversation regarding performance gap.\n2. Written Warning: Formal notice with specific improvement targets and timeline.\n3. PIP: 30-60 day structured improvement plan with weekly checkpoints.\n4. Final Warning / Termination: If PIP objectives are not met.\n\n**Support:**\n- Training and coaching should be offered where applicable.\n- Employees may be reassigned to roles better suited to their skills if available.`,
     rules: [
       {
@@ -489,7 +509,8 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "medium",
         actionType: "written_warning",
         escalationLevel: 2,
-        description: "Second missed deadline within 90 days — written warning with performance improvement targets.",
+        description:
+          "Second missed deadline within 90 days — written warning with performance improvement targets.",
         conditions: { max_per_year: 3, window_days: 90 },
       },
       {
@@ -499,7 +520,8 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "medium",
         actionType: "written_warning",
         escalationLevel: 2,
-        description: "Deliverable rejected for quality concerns — written warning with coaching plan.",
+        description:
+          "Deliverable rejected for quality concerns — written warning with coaching plan.",
         conditions: { max_per_year: 2, window_days: 180 },
       },
       {
@@ -509,14 +531,21 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
         severity: "high",
         actionType: "termination_review",
         escalationLevel: 4,
-        description: "Failure to meet PIP objectives after 30-60 day period — HR review for termination.",
+        description:
+          "Failure to meet PIP objectives after 30-60 day period — HR review for termination.",
         conditions: { max_per_year: 1, window_days: 365 },
       },
     ],
     severity_levels: {
       low: { description: "Minor miss or quality issue", actions: ["verbal_warning"] },
-      medium: { description: "Repeated misses or quality failures", actions: ["written_warning"] },
-      high: { description: "PIP failure or gross performance issues", actions: ["pip", "termination_review"] },
+      medium: {
+        description: "Repeated misses or quality failures",
+        actions: ["written_warning"],
+      },
+      high: {
+        description: "PIP failure or gross performance issues",
+        actions: ["pip", "termination_review"],
+      },
     },
   },
 ];
@@ -524,14 +553,18 @@ const BASELINE_POLICIES: BaselinePolicyInput[] = [
 export async function seedBaselinePolicies(
   companyId: string,
   userId: string,
-  templateIds: string[] = ["attendance-punctuality", "workplace-conduct", "performance-management"],
+  templateIds: string[] = [
+    "attendance-punctuality",
+    "workplace-conduct",
+    "performance-management",
+  ],
 ): Promise<PolicyResponse[]> {
   const supabase = createAdminClient();
   const now = new Date().toISOString();
   const effectiveDate = now.split("T")[0];
 
-  const policiesToCreate = BASELINE_POLICIES.filter(
-    (p) => templateIds.includes(p.template_id),
+  const policiesToCreate = BASELINE_POLICIES.filter((p) =>
+    templateIds.includes(p.template_id),
   );
 
   if (policiesToCreate.length === 0) {
@@ -554,10 +587,7 @@ export async function seedBaselinePolicies(
     updated_at: now,
   }));
 
-  const { data, error } = await supabase
-    .from("policies")
-    .insert(records)
-    .select();
+  const { data, error } = await supabase.from("policies").insert(records).select();
 
   if (error) {
     throw new Error(`Failed to seed baseline policies: ${error.message}`);

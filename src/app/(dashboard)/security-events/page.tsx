@@ -17,7 +17,7 @@ import {
   User,
   Settings,
   FileText,
-  Login,
+  LogIn,
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
@@ -35,15 +35,22 @@ interface SecurityEvent {
 }
 
 const eventTypeConfig: Record<string, { label: string; icon: any; color: string }> = {
-  login: { label: "Login", icon: Login, color: "text-brand-primary" },
+  login: { label: "Login", icon: LogIn, color: "text-brand-primary" },
   logout: { label: "Logout", icon: User, color: "text-text-secondary" },
   data_access: { label: "Data Access", icon: FileText, color: "text-brand-warning" },
   policy_change: { label: "Policy Change", icon: Settings, color: "text-brand-error" },
   user_management: { label: "User Management", icon: User, color: "text-brand-primary" },
-  settings_change: { label: "Settings Change", icon: Settings, color: "text-text-secondary" },
+  settings_change: {
+    label: "Settings Change",
+    icon: Settings,
+    color: "text-text-secondary",
+  },
 };
 
-const severityConfig: Record<string, { label: string; variant: "default" | "warning" | "error" }> = {
+const severityConfig: Record<
+  string,
+  { label: string; variant: "default" | "warning" | "error" }
+> = {
   low: { label: "Low", variant: "default" },
   medium: { label: "Medium", variant: "warning" },
   high: { label: "High", variant: "error" },
@@ -131,7 +138,9 @@ export default function SecurityEventsPage() {
       }
     }
     loadEvents();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filteredEvents = useMemo(() => {
@@ -141,20 +150,24 @@ export default function SecurityEventsPage() {
         event.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
         event.details.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = typeFilter === "all" || event.type === typeFilter;
-      const matchesSeverity = severityFilter === "all" || event.severity === severityFilter;
+      const matchesSeverity =
+        severityFilter === "all" || event.severity === severityFilter;
       return matchesSearch && matchesType && matchesSeverity;
     });
   }, [events, searchQuery, typeFilter, severityFilter]);
 
-  const stats = useMemo(() => ({
-    total: events.length,
-    highSeverity: events.filter((e) => e.severity === "high").length,
-    todayEvents: events.filter((e) => {
-      const today = new Date();
-      const eventDate = new Date(e.timestamp);
-      return eventDate.toDateString() === today.toDateString();
-    }).length,
-  }), [events]);
+  const stats = useMemo(
+    () => ({
+      total: events.length,
+      highSeverity: events.filter((e) => e.severity === "high").length,
+      todayEvents: events.filter((e) => {
+        const today = new Date();
+        const eventDate = new Date(e.timestamp);
+        return eventDate.toDateString() === today.toDateString();
+      }).length,
+    }),
+    [events],
+  );
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -197,7 +210,9 @@ export default function SecurityEventsPage() {
                   <AlertTriangle className="h-5 w-5 text-brand-error" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-text-primary">{stats.highSeverity}</p>
+                  <p className="text-2xl font-bold text-text-primary">
+                    {stats.highSeverity}
+                  </p>
                   <p className="text-xs text-text-tertiary">High Severity</p>
                 </div>
               </div>
@@ -208,7 +223,9 @@ export default function SecurityEventsPage() {
                   <CheckCircle className="h-5 w-5 text-brand-success" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-text-primary">{stats.todayEvents}</p>
+                  <p className="text-2xl font-bold text-text-primary">
+                    {stats.todayEvents}
+                  </p>
                   <p className="text-xs text-text-tertiary">Today&apos;s Events</p>
                 </div>
               </div>
@@ -217,7 +234,7 @@ export default function SecurityEventsPage() {
 
           {/* Search and Filters */}
           <div className="mb-6 flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
+            <div className="relative min-w-[200px] max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
               <Input
                 placeholder="Search events..."
@@ -231,7 +248,7 @@ export default function SecurityEventsPage() {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="rounded-md border border-border bg-brand-slate-dark px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                className="bg-brand-slate-dark rounded-md border border-border px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
               >
                 <option value="all">All Types</option>
                 <option value="login">Login</option>
@@ -243,7 +260,7 @@ export default function SecurityEventsPage() {
               <select
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
-                className="rounded-md border border-border bg-brand-slate-dark px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                className="bg-brand-slate-dark rounded-md border border-border px-3 py-2 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
               >
                 <option value="all">All Severity</option>
                 <option value="low">Low</option>
@@ -283,31 +300,47 @@ export default function SecurityEventsPage() {
           ) : (
             <div className="space-y-3">
               {filteredEvents.map((event) => {
-                const typeInfo = eventTypeConfig[event.type] || { label: event.type, icon: Shield, color: "text-text-secondary" };
-                const severityInfo = severityConfig[event.severity] || { label: event.severity, variant: "default" as const };
+                const typeInfo = eventTypeConfig[event.type] || {
+                  label: event.type,
+                  icon: Shield,
+                  color: "text-text-secondary",
+                };
+                const severityInfo = severityConfig[event.severity] || {
+                  label: event.severity,
+                  variant: "default" as const,
+                };
                 const Icon = typeInfo.icon;
 
                 return (
-                  <Card key={event.id} className="p-4 transition-colors hover:bg-card-hover">
+                  <Card
+                    key={event.id}
+                    className="p-4 transition-colors hover:bg-card-hover"
+                  >
                     <div className="flex items-start gap-4">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-brand-slate-light ${typeInfo.color}`}>
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg bg-brand-slate-light ${typeInfo.color}`}
+                      >
                         <Icon className="h-5 w-5" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-text-primary">{event.action}</span>
-                          <Badge variant={severityInfo.variant}>{severityInfo.label}</Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-text-primary">
+                            {event.action}
+                          </span>
+                          <Badge variant={severityInfo.variant}>
+                            {severityInfo.label}
+                          </Badge>
                           <Badge variant="outline">{typeInfo.label}</Badge>
                         </div>
-                        <p className="mt-1 text-sm text-text-secondary">{event.details}</p>
+                        <p className="mt-1 text-sm text-text-secondary">
+                          {event.details}
+                        </p>
                         <div className="mt-2 flex items-center gap-4 text-xs text-text-tertiary">
                           <span className="flex items-center gap-1">
                             <User className="h-3 w-3" />
                             {event.user_email || event.user_id}
                           </span>
-                          {event.ip_address && (
-                            <span>IP: {event.ip_address}</span>
-                          )}
+                          {event.ip_address && <span>IP: {event.ip_address}</span>}
                           <span>{formatTime(event.timestamp)}</span>
                         </div>
                       </div>

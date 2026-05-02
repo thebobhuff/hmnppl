@@ -67,6 +67,41 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestFormData<T>(path: string, formData: FormData): Promise<T> {
+  const url = `${API_BASE}${path}`;
+
+  let response: Response;
+  if (typeof window !== "undefined") {
+    const { csrfFetch } = await import("@/lib/csrf-client");
+    response = await csrfFetch(url, {
+      method: "POST",
+      body: formData,
+    });
+  } else {
+    response = await fetch(url, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+  }
+
+  if (!response.ok) {
+    let body: Record<string, unknown> = {};
+    try {
+      body = await response.json();
+    } catch {
+      // Ignore
+    }
+    throw new APIError(
+      response.status,
+      (body.error as string) ?? `Request failed with status ${response.status}`,
+      body.details as Record<string, unknown>[] | undefined,
+    );
+  }
+
+  return response.json() as Promise<T>;
+}
+
 // ---------------------------------------------------------------------------
 // Policies
 // ---------------------------------------------------------------------------
@@ -105,6 +140,23 @@ export const policiesAPI = {
     }>(`/policies/${id}/toggle`, { method: "PATCH" }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/policies/${id}`, { method: "DELETE" }),
+  importDocument: (body: {
+    file: File;
+    title?: string;
+    category?: string;
+    documentType?: KnowledgeDocumentType;
+    activatePolicy?: boolean;
+  }) => {
+    const formData = new FormData();
+    formData.append("file", body.file);
+    if (body.title) formData.append("title", body.title);
+    if (body.category) formData.append("category", body.category);
+    if (body.documentType) formData.append("documentType", body.documentType);
+    if (body.activatePolicy !== undefined) {
+      formData.append("activatePolicy", String(body.activatePolicy));
+    }
+    return requestFormData<KnowledgeDocumentImportResponse>(`/policies/import`, formData);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -266,7 +318,15 @@ export const usersAPI = {
     department_id?: string;
     manager_id?: string;
   }) =>
-    request<{ user: UserResponse; inviteLink?: string; simulatedEmail?: boolean }>(`/users`, {
+    request<{ user: UserResponse; inviteLink?: string; simulatedEmail?: boolean }>(
+      `/users`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
+  importEmployees: (body: { rows: EmployeeImportRow[] }) =>
+    request<EmployeeImportResponse>(`/users/import`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
@@ -277,6 +337,11 @@ export const usersAPI = {
     }),
   timeline: (id: string) =>
     request<{ timeline: TimelineEvent[] }>(`/users/${id}/timeline`),
+  myEmployees: () =>
+    request<{
+      employees: MyTeamEmployeeResponse[];
+      summary: MyTeamSummary;
+    }>(`/users/me/employees`),
 };
 
 // ---------------------------------------------------------------------------
@@ -544,6 +609,33 @@ export interface PolicyResponse {
   updated_at: string;
 }
 
+export type KnowledgeDocumentType = "policy" | "handbook" | "procedure" | "other";
+
+export interface KnowledgeDocumentResponse {
+  id: string;
+  company_id: string;
+  policy_id: string | null;
+  title: string;
+  document_type: KnowledgeDocumentType;
+  source_file_name: string;
+  storage_bucket: string;
+  storage_path: string;
+  mime_type: string | null;
+  file_size: number;
+  extracted_text: string;
+  status: string;
+  metadata: Record<string, unknown>;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeDocumentImportResponse {
+  document: KnowledgeDocumentResponse;
+  policy: PolicyResponse;
+  extractedCharacters: number;
+}
+
 export interface IncidentListResponse {
   incidents: IncidentResponse[];
   total: number;
@@ -675,6 +767,65 @@ export interface UserResponse {
   hire_date: string | null;
   termination_date: string | null;
   last_login_at: string | null;
+}
+
+export interface EmployeeImportRow {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  role?: "employee" | "manager" | "hr_agent";
+  job_title?: string;
+  phone?: string;
+  department?: string;
+  department_id?: string;
+  manager_email?: string;
+  manager_id?: string;
+  hire_date?: string;
+}
+
+export interface EmployeeImportResult {
+  row: number;
+  email: string;
+  status: "invited" | "failed" | "skipped";
+  errors?: string[];
+  inviteLink?: string;
+  simulatedEmail?: boolean;
+}
+
+export interface EmployeeImportResponse {
+  results: EmployeeImportResult[];
+  summary: {
+    total: number;
+    invited: number;
+    failed: number;
+    skipped: number;
+  };
+}
+
+export type TeamRiskLevel = "critical" | "high" | "medium" | "low" | "none";
+
+export interface MyTeamIncidentStats {
+  total: number;
+  open: number;
+  closed: number;
+  lastIncidentAt: string | null;
+  lastIncidentType: string | null;
+  maxSeverity: string | null;
+  riskLevel: TeamRiskLevel;
+}
+
+export interface MyTeamEmployeeResponse extends UserResponse {
+  relationship: "direct_report" | "department_scope";
+  incidentStats: MyTeamIncidentStats;
+}
+
+export interface MyTeamSummary {
+  total: number;
+  directReports: number;
+  openIncidents: number;
+  criticalRisk: number;
+  highRisk: number;
+  noIncidents: number;
 }
 
 export interface TimelineEvent {
