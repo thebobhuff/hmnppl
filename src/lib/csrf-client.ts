@@ -29,8 +29,9 @@ export async function csrfFetch(
     throw new Error("Failed to obtain CSRF token");
   }
 
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(!isFormData ? { "Content-Type": "application/json" } : {}),
     "X-CSRF-Token": token,
     ...(options.headers as Record<string, string>),
   };

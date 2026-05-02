@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { policiesAPI, type APIError, type PolicyResponse } from "@/lib/api/client";
-import { FileText, Loader2, Plus, Shield, ShieldOff } from "lucide-react";
+import { FileText, Loader2, Plus, Shield, ShieldOff, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -63,12 +63,20 @@ export default function PoliciesPage() {
       title="Policies"
       description="Manage disciplinary policies and AI evaluation rules."
       actions={
-        <Button asChild size="sm">
-          <Link href="/policies/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Policy
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/policies/import">
+              <Upload className="mr-2 h-4 w-4" />
+              Import Document
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/policies/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Policy
+            </Link>
+          </Button>
+        </div>
       }
     >
       {error ? (

@@ -18,18 +18,29 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { APIErrorFallback } from "@/components/domain/ErrorBoundary";
-import { usersAPI, type UserResponse, type APIError } from "@/lib/api/client";
 import {
-  Users,
-  UserPlus,
-  Search,
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  Loader2,
   Mail,
+  MoreHorizontal,
+  Search,
   Shield,
   TrendingUp,
-  Clock,
-  MoreHorizontal,
-  Loader2,
+  Upload,
+  Users,
+  UserPlus,
+  XCircle,
 } from "lucide-react";
+import {
+  usersAPI,
+  type APIError,
+  type EmployeeImportResponse,
+  type EmployeeImportRow,
+  type UserResponse,
+} from "@/lib/api/client";
 
 const ROLE_OPTIONS = [
   { value: "", label: "All Roles" },
@@ -46,6 +57,26 @@ const STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive" },
 ];
 
+const CSV_COLUMNS = [
+  "email",
+  "first_name",
+  "last_name",
+  "role",
+  "job_title",
+  "phone",
+  "department",
+  "manager_email",
+  "hire_date",
+];
+
+const CSV_TEMPLATE = `${CSV_COLUMNS.join(",")}
+alex.employee@example.com,Alex,Employee,employee,Sales Associate,555-0100,Sales,manager@example.com,2026-05-01`;
+
+type CsvPreviewRow = EmployeeImportRow & {
+  _row: number;
+  _errors: string[];
+};
+
 export default function TeamPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -55,6 +86,11 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<APIError | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importRows, setImportRows] = useState<CsvPreviewRow[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<EmployeeImportResponse | null>(null);
   const { toast } = useToast();
 
   const breadcrumbs = usePageBreadcrumbs([
@@ -146,15 +182,85 @@ export default function TeamPage() {
     }
   };
 
+  const handleImportFile = async (file: File | null) => {
+    setImportResult(null);
+    setImportRows([]);
+    setImportError(null);
+
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setImportError("Upload a .csv file.");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const rows = parseEmployeeCsv(text);
+      setImportRows(rows);
+      if (rows.length === 0) {
+        setImportError("The CSV did not contain any employee rows.");
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Unable to parse CSV.");
+    }
+  };
+
+  const handleImport = async () => {
+    const validRows = importRows.filter((row) => row._errors.length === 0);
+    if (validRows.length === 0) {
+      setImportError("Fix the CSV errors before importing.");
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError(null);
+
+    try {
+      const response = await usersAPI.importEmployees({
+        rows: validRows.map(({ _row, _errors, ...row }) => row),
+      });
+      setImportResult(response);
+      await fetchUsers();
+      toast({
+        title: "CSV import complete",
+        description: `${response.summary.invited} invited, ${response.summary.failed} failed, ${response.summary.skipped} skipped.`,
+        variant: response.summary.failed > 0 ? "warning" : "success",
+      });
+    } catch (error) {
+      console.error("[team] CSV import failed:", error);
+      setImportError(error instanceof Error ? error.message : "CSV import failed.");
+      toast({
+        title: "CSV import failed",
+        description: "The employee import could not be completed.",
+        variant: "error",
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const resetImport = () => {
+    setImportRows([]);
+    setImportError(null);
+    setImportResult(null);
+  };
+
   return (
     <PageContainer
       title="Team"
       description="Manage employees, roles, and invitations."
       actions={
-        <Button size="sm" onClick={() => setInviteModalOpen(true)}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Invite Member
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportModalOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button size="sm" onClick={() => setInviteModalOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Invite Member
+          </Button>
+        </div>
       }
     >
       <div className="grid gap-6">
@@ -338,6 +444,19 @@ export default function TeamPage() {
         onInvite={handleInvite}
         loading={inviteLoading}
       />
+      <ImportCsvModal
+        open={importModalOpen}
+        onOpenChange={(open) => {
+          setImportModalOpen(open);
+          if (!open) resetImport();
+        }}
+        rows={importRows}
+        error={importError}
+        loading={importLoading}
+        result={importResult}
+        onFile={handleImportFile}
+        onImport={handleImport}
+      />
     </PageContainer>
   );
 }
@@ -421,6 +540,211 @@ function InviteModal({
 }
 
 // ---------------------------------------------------------------------------
+// CSV Import Modal
+// ---------------------------------------------------------------------------
+
+function ImportCsvModal({
+  open,
+  onOpenChange,
+  rows,
+  error,
+  loading,
+  result,
+  onFile,
+  onImport,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  rows: CsvPreviewRow[];
+  error: string | null;
+  loading: boolean;
+  result: EmployeeImportResponse | null;
+  onFile: (file: File | null) => void;
+  onImport: () => Promise<void>;
+}) {
+  const invalidRows = rows.filter((row) => row._errors.length > 0).length;
+  const validRows = rows.length - invalidRows;
+
+  return (
+    <Modal open={open} onOpenChange={onOpenChange}>
+      <ModalContent size="xl" className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-text-primary">
+              Import Team Members
+            </h3>
+            <p className="text-sm text-text-secondary">
+              Upload a CSV to invite employees and attach manager, department, and job
+              details.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={downloadCsvTemplate}>
+            <Download className="mr-2 h-4 w-4" />
+            Template
+          </Button>
+        </div>
+
+        <div className="rounded-lg border border-border p-4">
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-brand-slate-light px-4 py-8 text-center transition-colors hover:bg-card-hover">
+            <FileSpreadsheet className="h-8 w-8 text-text-tertiary" />
+            <span className="text-sm font-medium text-text-primary">
+              Choose a CSV file
+            </span>
+            <span className="text-xs text-text-tertiary">
+              Required column: email. Optional: first_name, last_name, role, job_title,
+              phone, department, department_id, manager_email, manager_id, hire_date.
+            </span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="sr-only"
+              onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 rounded-lg border border-brand-error/30 bg-brand-error/5 p-3 text-sm text-text-secondary">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-error" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {rows.length > 0 && (
+          <div className="grid gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="success">{validRows} ready</Badge>
+              {invalidRows > 0 && <Badge variant="error">{invalidRows} invalid</Badge>}
+              <span className="text-xs text-text-tertiary">
+                Imports are capped at 100 rows per CSV.
+              </span>
+            </div>
+            <div className="max-h-64 overflow-auto rounded-lg border border-border">
+              <table className="w-full min-w-[760px]">
+                <thead>
+                  <tr className="bg-brand-slate-dark border-b border-border">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-text-tertiary">
+                      Row
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-text-tertiary">
+                      Employee
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-text-tertiary">
+                      Role
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-text-tertiary">
+                      Department
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-text-tertiary">
+                      Manager
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-text-tertiary">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.slice(0, 25).map((row) => (
+                    <tr key={`${row._row}-${row.email}`}>
+                      <td className="px-3 py-2 text-sm text-text-tertiary">{row._row}</td>
+                      <td className="px-3 py-2">
+                        <p className="text-sm font-medium text-text-primary">
+                          {row.first_name || row.last_name
+                            ? `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim()
+                            : "Invited user"}
+                        </p>
+                        <p className="text-xs text-text-tertiary">{row.email}</p>
+                      </td>
+                      <td className="px-3 py-2 text-sm text-text-secondary">
+                        {row.role ?? "employee"}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-text-secondary">
+                        {row.department || row.department_id || "-"}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-text-secondary">
+                        {row.manager_email || row.manager_id || "-"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row._errors.length === 0 ? (
+                          <Badge variant="success">
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                            Ready
+                          </Badge>
+                        ) : (
+                          <Badge variant="error">
+                            <XCircle className="mr-1 h-3 w-3" />
+                            {row._errors[0]}
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rows.length > 25 && (
+              <p className="text-xs text-text-tertiary">
+                Showing first 25 rows of {rows.length}.
+              </p>
+            )}
+          </div>
+        )}
+
+        {result && (
+          <div className="grid gap-3 rounded-lg border border-border p-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="success">{result.summary.invited} invited</Badge>
+              {result.summary.failed > 0 && (
+                <Badge variant="error">{result.summary.failed} failed</Badge>
+              )}
+              {result.summary.skipped > 0 && (
+                <Badge variant="warning">{result.summary.skipped} skipped</Badge>
+              )}
+            </div>
+            {result.results.some((item) => item.status !== "invited") && (
+              <div className="max-h-40 overflow-auto rounded-md border border-border">
+                {result.results
+                  .filter((item) => item.status !== "invited")
+                  .map((item) => (
+                    <div
+                      key={`${item.row}-${item.email}`}
+                      className="border-b border-border px-3 py-2 last:border-b-0"
+                    >
+                      <p className="text-sm font-medium text-text-primary">
+                        Row {item.row}: {item.email}
+                      </p>
+                      <p className="text-xs text-text-tertiary">
+                        {item.errors?.join(" ") ?? item.status}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
+            Close
+          </Button>
+          <Button
+            onClick={onImport}
+            disabled={loading || validRows === 0 || invalidRows > 0}
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Import and Invite
+          </Button>
+        </div>
+      </ModalContent>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Stat Card
 // ---------------------------------------------------------------------------
 
@@ -452,4 +776,159 @@ function StatCard({
       </div>
     </Card>
   );
+}
+
+function parseEmployeeCsv(text: string): CsvPreviewRow[] {
+  const table = parseCsv(text);
+  if (table.length < 2) return [];
+
+  const headers = table[0].map((header) => normalizeHeader(header));
+  const emailIndex = headers.indexOf("email");
+  if (emailIndex === -1) {
+    throw new Error("CSV must include an email column.");
+  }
+
+  return table
+    .slice(1)
+    .map((values, index) => {
+      const raw = Object.fromEntries(
+        headers.map((header, headerIndex) => [header, values[headerIndex]?.trim() ?? ""]),
+      );
+      const row: CsvPreviewRow = {
+        _row: index + 2,
+        _errors: [],
+        email: raw.email ?? "",
+        first_name: raw.first_name,
+        last_name: raw.last_name,
+        role: normalizeRole(raw.role),
+        job_title: raw.job_title,
+        phone: raw.phone,
+        department: raw.department,
+        department_id: raw.department_id,
+        manager_email: raw.manager_email,
+        manager_id: raw.manager_id,
+        hire_date: raw.hire_date,
+      };
+
+      row._errors = validateCsvPreviewRow(row);
+      return compactImportRow(row);
+    })
+    .filter((row) =>
+      Object.entries(row).some(
+        ([key, value]) =>
+          !key.startsWith("_") && typeof value === "string" && value.trim() !== "",
+      ),
+    );
+}
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += char;
+  }
+
+  row.push(value);
+  rows.push(row);
+
+  return rows.filter((csvRow) => csvRow.some((cell) => cell.trim().length > 0));
+}
+
+function normalizeHeader(header: string) {
+  return header.trim().toLowerCase().replaceAll(" ", "_");
+}
+
+function normalizeRole(value: string | undefined): EmployeeImportRow["role"] {
+  const role = value?.trim().toLowerCase();
+  if (role === "manager" || role === "hr_agent" || role === "employee") {
+    return role;
+  }
+  return role ? undefined : "employee";
+}
+
+function validateCsvPreviewRow(row: CsvPreviewRow) {
+  const errors: string[] = [];
+  if (!row.email) {
+    errors.push("Missing email");
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+    errors.push("Invalid email");
+  }
+  if (!row.role) {
+    errors.push("Invalid role");
+  }
+  if (row.hire_date && !/^\d{4}-\d{2}-\d{2}$/.test(row.hire_date)) {
+    errors.push("Invalid hire date");
+  }
+  return errors;
+}
+
+function compactImportRow(row: CsvPreviewRow): CsvPreviewRow {
+  const compacted: CsvPreviewRow = {
+    _row: row._row,
+    _errors: row._errors,
+    email: row.email.trim(),
+  };
+
+  for (const key of [
+    "first_name",
+    "last_name",
+    "role",
+    "job_title",
+    "phone",
+    "department",
+    "department_id",
+    "manager_email",
+    "manager_id",
+    "hire_date",
+  ] as const) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) {
+      compacted[key] = value.trim() as never;
+    }
+  }
+
+  return compacted;
+}
+
+function downloadCsvTemplate() {
+  const blob = new Blob([CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "team-import-template.csv";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

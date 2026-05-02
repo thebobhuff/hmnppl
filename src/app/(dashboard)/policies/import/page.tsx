@@ -1,359 +1,306 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  UploadCloud,
+} from "lucide-react";
+
 import { PageContainer } from "@/components/layout/PageContainer";
-import { Card, CardContent, CardFooter, CardHeader, CardSubtitle, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { FileUpload } from "@/components/ui/file-upload";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
-import { csrfFetch } from "@/lib/csrf-client";
-import { Bot, FileText, CheckCircle2, Loader2, ArrowRight, UploadCloud } from "lucide-react";
-import Link from "next/link";
+import { usePageBreadcrumbs } from "@/hooks/use-breadcrumbs";
+import {
+  policiesAPI,
+  type KnowledgeDocumentImportResponse,
+  type KnowledgeDocumentType,
+} from "@/lib/api/client";
 
-type DecomposeResult = {
-  policies_count?: number;
-  policies?: Array<{ title?: string; category?: string; summary?: string }>;
-};
+const DOCUMENT_TYPES: Array<{ value: KnowledgeDocumentType; label: string }> = [
+  { value: "policy", label: "Policy" },
+  { value: "handbook", label: "Handbook" },
+  { value: "procedure", label: "Procedure" },
+  { value: "other", label: "Other" },
+];
 
-type ExtractionStatusReporter = (message: string) => void;
+const CATEGORY_OPTIONS = [
+  { value: "attendance", label: "Attendance" },
+  { value: "conduct", label: "Conduct" },
+  { value: "performance", label: "Performance" },
+  { value: "safety", label: "Safety" },
+  { value: "handbook", label: "Handbook" },
+  { value: "general", label: "General" },
+];
 
-const MIN_HANDBOOK_TEXT_LENGTH = 50;
+export default function PolicyImportPage() {
+  usePageBreadcrumbs([
+    { label: "Home", href: "/dashboard" },
+    { label: "Policies", href: "/policies" },
+    { label: "Import" },
+  ]);
 
-async function extractTextFromFile(file: File, reportStatus?: ExtractionStatusReporter) {
-  const extension = file.name.split(".").pop()?.toLowerCase();
-
-  if (extension === "pdf") {
-    return extractPdfText(file, reportStatus);
-  }
-
-  if (extension === "docx") {
-    return extractDocxText(file);
-  }
-
-  throw new Error("Supported formats are PDF and Word (.docx).");
-}
-
-async function extractPdfText(file: File, reportStatus?: ExtractionStatusReporter) {
-  const pdfjs = await import("pdfjs-dist");
-  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      "pdfjs-dist/build/pdf.worker.min.mjs",
-      import.meta.url,
-    ).toString();
-  }
-
-  const buffer = await file.arrayBuffer();
-  const pdfDocument = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
-  const pages: string[] = [];
-
-  reportStatus?.(`Reading ${file.name} (${pdfDocument.numPages} pages)...`);
-
-  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
-    const page = await pdfDocument.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ")
-      .trim();
-
-    if (pageText) {
-      pages.push(pageText);
-    }
-  }
-
-  const extractedText = pages.join("\n\n");
-  if (normalizeHandbookText(extractedText).length >= MIN_HANDBOOK_TEXT_LENGTH) {
-    return extractedText;
-  }
-
-  reportStatus?.("No embedded text found. Running OCR on scanned PDF...");
-  return extractPdfTextWithOcr(pdfDocument, reportStatus);
-}
-
-async function extractPdfTextWithOcr(
-  pdfDocument: any,
-  reportStatus?: ExtractionStatusReporter,
-) {
-  const { createWorker } = await import("tesseract.js");
-  const worker = await createWorker("eng");
-  const pages: string[] = [];
-
-  try {
-    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
-      reportStatus?.(`Running OCR on page ${pageNumber} of ${pdfDocument.numPages}...`);
-
-      const page = await pdfDocument.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1.75 });
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        throw new Error("Could not create a canvas for OCR.");
-      }
-
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-
-      await page.render({ canvasContext: context, viewport }).promise;
-      const result = await worker.recognize(canvas);
-      const pageText = result.data.text.trim();
-
-      if (pageText) {
-        pages.push(pageText);
-      }
-    }
-  } finally {
-    await worker.terminate();
-  }
-
-  return pages.join("\n\n");
-}
-
-async function extractDocxText(file: File) {
-  const mammoth = await import("mammoth/mammoth.browser");
-  const buffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-  return result.value;
-}
-
-function normalizeHandbookText(value: string) {
-  return value.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-export default function HandbookImportPage() {
-  const [handbookText, setHandbookText] = useState("");
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [fileStatusMessage, setFileStatusMessage] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isExtractingFile, setIsExtractingFile] = useState(false);
-  const [result, setResult] = useState<DecomposeResult | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("handbook");
+  const [documentType, setDocumentType] = useState<KnowledgeDocumentType>("handbook");
+  const [activatePolicy, setActivatePolicy] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<KnowledgeDocumentImportResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const normalizedHandbookText = normalizeHandbookText(handbookText);
-  const canRunDecomposition =
-    !isProcessing &&
-    !isExtractingFile &&
-    normalizedHandbookText.length >= MIN_HANDBOOK_TEXT_LENGTH;
 
-  const handleFilesChange = async (files: File[]) => {
-    const file = files[0];
+  const inferredTitle = useMemo(() => {
+    if (title.trim()) return title.trim();
+    return file?.name.replace(/\.[^.]+$/, "") ?? "";
+  }, [file, title]);
 
-    if (!file) {
-      setSelectedFileName(null);
-      setFileStatusMessage(null);
-      return;
-    }
-
-    setIsExtractingFile(true);
+  const handleFilesChange = (files: File[]) => {
+    const selected = files[0] ?? null;
+    setFile(selected);
     setResult(null);
-    setFileStatusMessage(`Reading ${file.name}...`);
-
-    try {
-      const extractedText = normalizeHandbookText(
-        await extractTextFromFile(file, setFileStatusMessage),
-      );
-
-      if (extractedText.length < MIN_HANDBOOK_TEXT_LENGTH) {
-        throw new Error(
-          "We could not extract enough readable text from that document, even after OCR.",
-        );
-      }
-
-      setSelectedFileName(file.name);
-      setHandbookText(extractedText);
-      setFileStatusMessage(
-        `${file.name} is ready. ${extractedText.length.toLocaleString()} characters extracted.`,
-      );
-      toast({
-        title: "Document ready",
-        description: `${file.name} was parsed successfully. Review the extracted text below before importing.`,
-        variant: "default",
-      });
-    } catch (e: any) {
-      setSelectedFileName(file.name);
-      setHandbookText("");
-      setFileStatusMessage(
-        e.message || "We could not extract readable text from that document.",
-      );
-      toast({
-        title: "File parsing failed",
-        description: e.message || "We could not read that document.",
-        variant: "error",
-      });
-    } finally {
-      setIsExtractingFile(false);
+    setError(null);
+    if (selected && !title.trim()) {
+      setTitle(selected.name.replace(/\.[^.]+$/, ""));
     }
   };
 
-  const handleDecompose = async () => {
-    if (!normalizedHandbookText || normalizedHandbookText.length < MIN_HANDBOOK_TEXT_LENGTH) {
-      toast({
-        title: "Error",
-        description: "Upload a PDF or Word document, or paste at least 50 characters of handbook text.",
-        variant: "error",
-      });
+  const handleImport = async () => {
+    if (!file) {
+      setError("Choose a document to import.");
       return;
     }
 
-    setIsProcessing(true);
+    setLoading(true);
+    setError(null);
     setResult(null);
 
     try {
-      const res = await csrfFetch("/api/v1/agents/handbook-decompose", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handbook_text: normalizedHandbookText }),
+      const response = await policiesAPI.importDocument({
+        file,
+        title: inferredTitle,
+        category,
+        documentType,
+        activatePolicy,
       });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      const data = await res.json();
-      setResult(data);
+      setResult(response);
       toast({
-        title: "Success!",
-        description: `Successfully decomposed into ${data.policies_count || 0} modular policies.`,
-        variant: "default",
+        title: "Document imported",
+        description: `${response.extractedCharacters.toLocaleString()} characters were stored for AI context.`,
+        variant: "success",
       });
-    } catch (e: any) {
+    } catch (importError) {
+      const message =
+        importError instanceof Error ? importError.message : "Document import failed.";
+      setError(message);
       toast({
-        title: "AI Processing Failed",
-        description: e.message || "An error occurred during decomposition.",
+        title: "Import failed",
+        description: message,
         variant: "error",
       });
     } finally {
-      setIsProcessing(false);
+      setLoading(false);
     }
   };
 
   return (
-    <PageContainer title="Magic Handbook Import">
-      <div className="mx-auto max-w-4xl space-y-8">
-        <div className="flex items-center gap-4 bg-muted/30 p-6 rounded-xl border border-border mt-4">
-          <div className="bg-brand-primary/10 p-3 rounded-full">
-            <Bot className="h-8 w-8 text-brand-primary" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold">Transform static PDF handbooks into an intelligent context engine.</h2>
-            <p className="text-muted-foreground text-sm max-w-2xl mt-1">
-              Upload a PDF or Word (.docx) handbook, or paste the raw text manually. The AI will decompose it into distinct compliance policies and inject the results directly into your Vector DB.
-            </p>
-          </div>
+    <PageContainer
+      title="Import Policy Document"
+      description="Store handbooks, policies, and procedures as AI-readable company context."
+    >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid gap-6">
+          <Card className="p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-primary/10 text-brand-primary">
+                <UploadCloud className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-base font-semibold text-text-primary">
+                  Source File
+                </h2>
+                <p className="text-sm text-text-secondary">
+                  Supported formats: PDF, DOCX, TXT, Markdown, CSV, and JSON.
+                </p>
+              </div>
+            </div>
+            <FileUpload
+              accept=".pdf,.docx,.txt,.md,.markdown,.csv,.json"
+              maxFiles={1}
+              maxSize={25 * 1024 * 1024}
+              disabled={loading}
+              hint="Max 25 MB. The original file is stored privately and extracted text is indexed for the AI agent."
+              onFilesChange={handleFilesChange}
+            />
+          </Card>
+
+          <Card className="p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">
+                  Title
+                </label>
+                <Input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Employee Handbook 2026"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">
+                  Document Type
+                </label>
+                <Select
+                  value={documentType}
+                  onValueChange={(value) =>
+                    setDocumentType(value as KnowledgeDocumentType)
+                  }
+                  options={DOCUMENT_TYPES}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">
+                  AI Category
+                </label>
+                <Select
+                  value={category}
+                  onValueChange={setCategory}
+                  options={CATEGORY_OPTIONS}
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex items-end">
+                <Switch
+                  checked={activatePolicy}
+                  onCheckedChange={setActivatePolicy}
+                  disabled={loading}
+                  label="Use in AI evaluations"
+                  description="Creates an active policy context record from this document."
+                />
+              </div>
+            </div>
+          </Card>
+
+          {error && (
+            <Card className="border-brand-error/30 bg-brand-error/5 p-4">
+              <p className="text-sm text-text-primary">{error}</p>
+            </Card>
+          )}
+
+          {result && (
+            <Card className="border-brand-success/30 bg-brand-success/5 p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-success" />
+                  <div>
+                    <h2 className="font-display text-base font-semibold text-text-primary">
+                      Import Complete
+                    </h2>
+                    <p className="mt-1 text-sm text-text-secondary">
+                      {result.document.source_file_name} was stored and linked to an AI
+                      policy context record.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="success">{result.document.status}</Badge>
+                      <Badge variant={result.policy.is_active ? "success" : "default"}>
+                        {result.policy.is_active ? "AI active" : "draft"}
+                      </Badge>
+                      <Badge variant="outline">
+                        {result.extractedCharacters.toLocaleString()} chars
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <Button asChild size="sm">
+                  <Link href={`/policies/${result.policy.id}/edit`}>
+                    Review Policy
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </Card>
+          )}
         </div>
 
-        {result ? (
-          <Card className="border-green-500/50 bg-green-500/5 mt-8">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-6 w-6 text-green-500" />
-                <CardTitle>Decomposition Complete!</CardTitle>
-              </div>
-              <CardSubtitle>
-                The AI successfully saved and embedded {result.policies_count} specific policies.
-              </CardSubtitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {result.policies?.map((pol: any, idx: number) => (
-                  <div key={idx} className="flex flex-col space-y-1 p-4 rounded-md border border-border bg-background">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-sm">{pol.title}</h4>
-                      <span className="text-xs bg-muted px-2 py-1 rounded capitalize">{pol.category}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{pol.summary}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button asChild className="w-full">
-                <Link href="/policies">
-                  View Policies in Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload Handbook or Paste Text</CardTitle>
-              <CardSubtitle>Use a PDF or Word (.docx) document, then review the extracted text before running decomposition.</CardSubtitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-5">
-                <div>
-                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-text-primary">
-                    <UploadCloud className="h-4 w-4 text-brand-primary" />
-                    Upload source document
-                  </div>
-                  <FileUpload
-                    accept=".pdf,.docx"
-                    maxFiles={1}
-                    maxSize={20 * 1024 * 1024}
-                    disabled={isProcessing || isExtractingFile}
-                    hint="Supported formats: PDF, Word (.docx). Max 20 MB."
-                    onFilesChange={handleFilesChange}
-                  />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {isExtractingFile
-                      ? "Extracting text from the uploaded document..."
-                      : fileStatusMessage
-                        ? fileStatusMessage
-                        : selectedFileName
-                          ? `Loaded ${selectedFileName}. You can edit the extracted text below before import.`
-                        : "No file selected yet. You can also paste text directly into the editor below."}
-                  </p>
-                  {!isExtractingFile && selectedFileName && normalizedHandbookText.length < MIN_HANDBOOK_TEXT_LENGTH && (
-                    <p className="mt-2 text-xs text-brand-warning">
-                      This file still does not contain enough extracted text for AI decomposition. If OCR could not recover the contents cleanly, try a clearer scan or a Word export.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-medium text-text-primary">Extracted handbook text</p>
-                    <p className="text-xs text-muted-foreground">{normalizedHandbookText.length} characters</p>
-                  </div>
-                  <Textarea 
-                    placeholder="Welcome to Acme Corp! \n\n1. PTO Policy: Full-time employees receive 15 days of PTO..."
-                    className="min-h-[400px] font-mono text-sm leading-relaxed"
-                    value={handbookText}
-                    onChange={(e) => setHandbookText(e.target.value)}
-                    disabled={isProcessing || isExtractingFile}
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between border-t border-border pt-4">
-              <p className="text-xs text-muted-foreground">
-                {canRunDecomposition
-                  ? "Document is ready for AI decomposition."
-                  : `AI decomposition becomes available at ${MIN_HANDBOOK_TEXT_LENGTH} readable characters.`}
+        <div className="grid gap-4 self-start">
+          <Card className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Bot className="h-5 w-5 text-brand-primary" />
+              <h2 className="font-display text-base font-semibold text-text-primary">
+                AI Context
+              </h2>
+            </div>
+            <div className="space-y-3 text-sm text-text-secondary">
+              <p>
+                The uploaded file is stored in the private Supabase documents bucket under
+                your company folder.
               </p>
-              <Button onClick={handleDecompose} disabled={!canRunDecomposition}>
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Extracting & Embedding...
-                  </>
-                ) : isExtractingFile ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Reading Document...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Run AI Decomposition
-                  </>
-                )}
-              </Button>
-            </CardFooter>
+              <p>
+                Extracted text is copied into an active policy context record so new
+                incidents can include the handbook or policy text in AI evaluation.
+              </p>
+              <p>
+                The importer does not infer structured disciplinary rules yet; review the
+                created policy if you need rule-based escalation logic.
+              </p>
+            </div>
           </Card>
-        )}
+
+          <Card className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-text-secondary" />
+              <h2 className="font-display text-base font-semibold text-text-primary">
+                Import Summary
+              </h2>
+            </div>
+            <Textarea
+              readOnly
+              value={
+                file
+                  ? `File: ${file.name}\nSize: ${formatFileSize(file.size)}\nTitle: ${
+                      inferredTitle || "Not set"
+                    }\nCategory: ${category}\nAI active: ${activatePolicy ? "yes" : "no"}`
+                  : "No file selected."
+              }
+              className="min-h-[150px] resize-none font-mono text-xs"
+            />
+          </Card>
+
+          <div className="flex justify-end gap-2">
+            <Button asChild variant="outline" disabled={loading}>
+              <Link href="/policies">Cancel</Link>
+            </Button>
+            <Button onClick={handleImport} disabled={loading || !file}>
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <UploadCloud className="mr-2 h-4 w-4" />
+              )}
+              Import Document
+            </Button>
+          </div>
+        </div>
       </div>
     </PageContainer>
   );
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
