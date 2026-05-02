@@ -9,6 +9,7 @@
  *   5. Returns success with redirect to /dashboard
  */
 import { sendTeamInviteEmail } from "@/lib/services/email";
+import { seedBaselinePolicies } from "@/lib/services/policy-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { onboardingPayloadSchema } from "@/lib/validations/onboarding";
@@ -113,25 +114,19 @@ export async function POST(request: Request) {
     );
   }
 
-  // --- 2. Create policy records ---
-  const policyRecords = selectedPolicies.map((templateId, index) => ({
-    company_id: companyId,
-    template_id: templateId,
-    title: getPolicyTitle(templateId),
-    description: getPolicyDescription(templateId),
-    status: "active",
-    version: 1,
-    is_ai_managed: true,
-    sort_order: index,
-  }));
-
-  if (policyRecords.length > 0) {
-    const { error: policyError } = await admin.from("policies").insert(policyRecords);
-
-    if (policyError) {
-      console.error("[onboarding] Policy creation failed:", policyError.message);
-      // Non-fatal: company is still marked as onboarded
-      // Policies can be re-created later
+  // --- 2. Create baseline policies with full rules ---
+  if (selectedPolicies.length > 0) {
+    try {
+      const seededPolicies = await seedBaselinePolicies(
+        companyId,
+        user.id,
+        selectedPolicies,
+      );
+      if (seededPolicies.length > 0) {
+        console.log(`[onboarding] Seeded ${seededPolicies.length} baseline policies`);
+      }
+    } catch (err) {
+      console.error("[onboarding] Policy seeding failed:", err);
     }
   }
 

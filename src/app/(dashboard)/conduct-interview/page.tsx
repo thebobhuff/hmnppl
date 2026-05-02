@@ -22,6 +22,7 @@ import {
   Play,
   Upload,
   Loader2,
+  XCircle,
 } from "lucide-react";
 
 interface Question {
@@ -33,23 +34,88 @@ interface Question {
 
 const interviewTemplates: Record<string, Question[]> = {
   tardiness: [
-    { id: "1", text: "Can you describe what happened on the morning of the incident?", type: "text", required: true },
-    { id: "2", text: "Did you notify your supervisor before your scheduled start time?", type: "yes_no", required: true },
-    { id: "3", text: "How many times has this type of issue occurred in the past 30 days?", type: "text", required: true },
-    { id: "4", text: "On a scale of 1-10, how would you rate your commitment to being on time?", type: "scale", required: true },
-    { id: "5", text: "What steps will you take to ensure punctuality going forward?", type: "text", required: true },
+    {
+      id: "1",
+      text: "Can you describe what happened on the morning of the incident?",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "2",
+      text: "Did you notify your supervisor before your scheduled start time?",
+      type: "yes_no",
+      required: true,
+    },
+    {
+      id: "3",
+      text: "How many times has this type of issue occurred in the past 30 days?",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "4",
+      text: "On a scale of 1-10, how would you rate your commitment to being on time?",
+      type: "scale",
+      required: true,
+    },
+    {
+      id: "5",
+      text: "What steps will you take to ensure punctuality going forward?",
+      type: "text",
+      required: true,
+    },
   ],
   misconduct: [
-    { id: "1", text: "Please describe the incident in your own words.", type: "text", required: true },
-    { id: "2", text: "Do you understand why this behavior is considered a violation?", type: "yes_no", required: true },
-    { id: "3", text: "Were there any circumstances that contributed to this incident?", type: "text", required: false },
-    { id: "4", text: "How do you plan to prevent this from happening again?", type: "text", required: true },
+    {
+      id: "1",
+      text: "Please describe the incident in your own words.",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "2",
+      text: "Do you understand why this behavior is considered a violation?",
+      type: "yes_no",
+      required: true,
+    },
+    {
+      id: "3",
+      text: "Were there any circumstances that contributed to this incident?",
+      type: "text",
+      required: false,
+    },
+    {
+      id: "4",
+      text: "How do you plan to prevent this from happening again?",
+      type: "text",
+      required: true,
+    },
   ],
   performance: [
-    { id: "1", text: "Are you aware of the performance expectations for your role?", type: "yes_no", required: true },
-    { id: "2", text: "Can you identify the areas where you have struggled to meet expectations?", type: "text", required: true },
-    { id: "3", text: "What support do you need from management to improve?", type: "text", required: true },
-    { id: "4", text: "On a scale of 1-10, how confident are you in meeting expectations within 60 days?", type: "scale", required: true },
+    {
+      id: "1",
+      text: "Are you aware of the performance expectations for your role?",
+      type: "yes_no",
+      required: true,
+    },
+    {
+      id: "2",
+      text: "Can you identify the areas where you have struggled to meet expectations?",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "3",
+      text: "What support do you need from management to improve?",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "4",
+      text: "On a scale of 1-10, how confident are you in meeting expectations within 60 days?",
+      type: "scale",
+      required: true,
+    },
   ],
 };
 
@@ -116,8 +182,12 @@ export default function ConductInterviewPage() {
   const renderPrepare = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Pre-Interview Checklist</h3>
-        <p className="text-sm text-text-secondary">Ensure all documents are prepared before starting.</p>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">
+          Pre-Interview Checklist
+        </h3>
+        <p className="text-sm text-text-secondary">
+          Ensure all documents are prepared before starting.
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -128,14 +198,19 @@ export default function ConductInterviewPage() {
           { label: "Witness statements collected", done: false },
           { label: "HR representative confirmed", done: true },
         ].map((item, i) => (
-          <div key={i} className="flex items-center justify-between rounded-lg border border-border p-4">
+          <div
+            key={i}
+            className="flex items-center justify-between rounded-lg border border-border p-4"
+          >
             <div className="flex items-center gap-3">
               {item.done ? (
                 <CheckCircle className="h-5 w-5 text-brand-success" />
               ) : (
                 <div className="h-5 w-5 rounded-full border-2 border-border" />
               )}
-              <span className={item.done ? "text-text-secondary" : "text-text-primary"}>{item.label}</span>
+              <span className={item.done ? "text-text-secondary" : "text-text-primary"}>
+                {item.label}
+              </span>
             </div>
             {item.done ? (
               <Badge variant="success">Complete</Badge>
@@ -148,7 +223,9 @@ export default function ConductInterviewPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-text-primary">Employee Name</label>
+          <label className="block text-sm font-medium text-text-primary">
+            Employee Name
+          </label>
           <Input
             value={employeeName}
             onChange={(e) => setEmployeeName(e.target.value)}
@@ -157,7 +234,9 @@ export default function ConductInterviewPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-text-primary">Incident Reference</label>
+          <label className="block text-sm font-medium text-text-primary">
+            Incident Reference
+          </label>
           <Input
             value={incidentRef}
             onChange={(e) => setIncidentRef(e.target.value)}
@@ -166,11 +245,13 @@ export default function ConductInterviewPage() {
           />
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-text-primary">Interview Type</label>
+          <label className="block text-sm font-medium text-text-primary">
+            Interview Type
+          </label>
           <select
             value={incidentType}
             onChange={(e) => setIncidentType(e.target.value)}
-            className="mt-1 w-full rounded-md border border-border bg-brand-slate-dark px-3 py-2 text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+            className="bg-brand-slate-dark mt-1 w-full rounded-md border border-border px-3 py-2 text-text-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
           >
             <option value="tardiness">Tardiness</option>
             <option value="misconduct">Misconduct</option>
@@ -184,8 +265,12 @@ export default function ConductInterviewPage() {
   const renderQuestions = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Interview Questions</h3>
-        <p className="text-sm text-text-secondary">Ask each question and record the response.</p>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">
+          Interview Questions
+        </h3>
+        <p className="text-sm text-text-secondary">
+          Ask each question and record the response.
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -255,7 +340,9 @@ export default function ConductInterviewPage() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-text-primary">Additional Notes</label>
+        <label className="block text-sm font-medium text-text-primary">
+          Additional Notes
+        </label>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -269,14 +356,20 @@ export default function ConductInterviewPage() {
   const renderEvidence = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Evidence & Witnesses</h3>
-        <p className="text-sm text-text-secondary">Upload supporting documents and record witnesses.</p>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">
+          Evidence & Witnesses
+        </h3>
+        <p className="text-sm text-text-secondary">
+          Upload supporting documents and record witnesses.
+        </p>
       </div>
 
-      <Card className="p-4 border-dashed border-2">
+      <Card className="border-2 border-dashed p-4">
         <div className="flex flex-col items-center justify-center py-8">
           <Upload className="h-12 w-12 text-text-tertiary" />
-          <p className="mt-2 text-sm text-text-secondary">Drop files here or click to upload</p>
+          <p className="mt-2 text-sm text-text-secondary">
+            Drop files here or click to upload
+          </p>
           <p className="text-xs text-text-tertiary">PDF, PNG, JPG up to 10MB</p>
           <Button variant="outline" className="mt-4">
             Choose Files
@@ -303,7 +396,10 @@ export default function ConductInterviewPage() {
               <Badge key={i} variant="outline" className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
                 {w}
-                <button onClick={() => setWitnesses(witnesses.filter((_, idx) => idx !== i))} className="ml-1">
+                <button
+                  onClick={() => setWitnesses(witnesses.filter((_, idx) => idx !== i))}
+                  className="ml-1"
+                >
                   ├ù
                 </button>
               </Badge>
@@ -317,18 +413,46 @@ export default function ConductInterviewPage() {
   const renderOutcome = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">Interview Outcome</h3>
-        <p className="text-sm text-text-secondary">Select the appropriate action based on the interview.</p>
+        <h3 className="mb-2 font-display text-lg font-semibold text-text-primary">
+          Interview Outcome
+        </h3>
+        <p className="text-sm text-text-secondary">
+          Select the appropriate action based on the interview.
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         {[
-          { value: "verbal_warning", label: "Verbal Warning", description: "Coach employee with verbal warning" },
-          { value: "written_warning", label: "Written Warning", description: "Issue formal written warning" },
-          { value: "pip", label: "Performance Improvement Plan", description: "Initiate 60-day PIP" },
-          { value: "termination_review", label: "Termination Review", description: "Escalate to legal for termination" },
-          { value: "no_action", label: "No Action Needed", description: "Close with no disciplinary action" },
-          { value: "further_investigation", label: "Further Investigation", description: "Requires additional review" },
+          {
+            value: "verbal_warning",
+            label: "Verbal Warning",
+            description: "Coach employee with verbal warning",
+          },
+          {
+            value: "written_warning",
+            label: "Written Warning",
+            description: "Issue formal written warning",
+          },
+          {
+            value: "pip",
+            label: "Performance Improvement Plan",
+            description: "Initiate 60-day PIP",
+          },
+          {
+            value: "termination_review",
+            label: "Termination Review",
+            description: "Escalate to legal for termination",
+          },
+          {
+            value: "no_action",
+            label: "No Action Needed",
+            description: "Close with no disciplinary action",
+          },
+          {
+            value: "further_investigation",
+            label: "Further Investigation",
+            description: "Requires additional review",
+          },
         ].map((option) => (
           <Card
             key={option.value}
@@ -346,7 +470,9 @@ export default function ConductInterviewPage() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-text-primary">Action Plan (required)</label>
+        <label className="block text-sm font-medium text-text-primary">
+          Action Plan (required)
+        </label>
         <Textarea
           value={actionPlan}
           onChange={(e) => setActionPlan(e.target.value)}
@@ -366,32 +492,48 @@ export default function ConductInterviewPage() {
       </div>
 
       <div className="text-center">
-        <h2 className="font-display text-2xl font-bold text-text-primary">Interview Complete</h2>
-        <p className="mt-2 text-text-secondary">The interview has been recorded and saved.</p>
+        <h2 className="font-display text-2xl font-bold text-text-primary">
+          Interview Complete
+        </h2>
+        <p className="mt-2 text-text-secondary">
+          The interview has been recorded and saved.
+        </p>
       </div>
 
       <Card className="p-6">
-        <h3 className="mb-4 font-display text-lg font-semibold text-text-primary">Summary</h3>
+        <h3 className="mb-4 font-display text-lg font-semibold text-text-primary">
+          Summary
+        </h3>
         <div className="space-y-3 text-sm">
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-text-tertiary">Employee</span>
-            <span className="font-medium text-text-primary">{employeeName || "Not specified"}</span>
+            <span className="font-medium text-text-primary">
+              {employeeName || "Not specified"}
+            </span>
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-text-tertiary">Incident</span>
-            <span className="font-medium text-text-primary">{incidentRef || "Not specified"}</span>
+            <span className="font-medium text-text-primary">
+              {incidentRef || "Not specified"}
+            </span>
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-text-tertiary">Type</span>
-            <span className="font-medium text-text-primary capitalize">{incidentType}</span>
+            <span className="font-medium capitalize text-text-primary">
+              {incidentType}
+            </span>
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-text-tertiary">Outcome</span>
-            <span className="font-medium text-text-primary capitalize">{outcome.replace(/_/g, " ")}</span>
+            <span className="font-medium capitalize text-text-primary">
+              {outcome.replace(/_/g, " ")}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-text-tertiary">Witnesses</span>
-            <span className="font-medium text-text-primary">{witnesses.length > 0 ? witnesses.join(", ") : "None"}</span>
+            <span className="font-medium text-text-primary">
+              {witnesses.length > 0 ? witnesses.join(", ") : "None"}
+            </span>
           </div>
         </div>
       </Card>
@@ -425,16 +567,32 @@ export default function ConductInterviewPage() {
                 const isCompleted = i < currentStepIndex;
                 return (
                   <div key={s.id} className="flex items-center">
-                    <div className={`flex items-center gap-2 ${isActive ? "text-brand-primary" : isCompleted ? "text-brand-success" : "text-text-tertiary"}`}>
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                        isCompleted ? "bg-brand-success text-text-inverse" : isActive ? "bg-brand-primary text-text-inverse" : "bg-brand-slate-light"
-                      }`}>
-                        {isCompleted ? <CheckCircle className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                    <div
+                      className={`flex items-center gap-2 ${isActive ? "text-brand-primary" : isCompleted ? "text-brand-success" : "text-text-tertiary"}`}
+                    >
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                          isCompleted
+                            ? "bg-brand-success text-text-inverse"
+                            : isActive
+                              ? "bg-brand-primary text-text-inverse"
+                              : "bg-brand-slate-light"
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <CheckCircle className="h-4 w-4" />
+                        ) : (
+                          <Icon className="h-4 w-4" />
+                        )}
                       </div>
-                      <span className="hidden text-sm font-medium sm:block">{s.label}</span>
+                      <span className="hidden text-sm font-medium sm:block">
+                        {s.label}
+                      </span>
                     </div>
                     {i < steps.length - 1 && (
-                      <div className={`mx-2 h-0.5 w-8 sm:w-16 ${isCompleted ? "bg-brand-success" : "bg-brand-slate-light"}`} />
+                      <div
+                        className={`mx-2 h-0.5 w-8 sm:w-16 ${isCompleted ? "bg-brand-success" : "bg-brand-slate-light"}`}
+                      />
                     )}
                   </div>
                 );
@@ -462,7 +620,11 @@ export default function ConductInterviewPage() {
               <div className="flex gap-2">
                 {step === "outcome" ? (
                   <Button onClick={handleSave} disabled={saving}>
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {saving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
                     Save & Complete
                   </Button>
                 ) : (

@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { meetingsAPI } from "@/lib/api/client";
+import { PreMeetingDiagnosisPanel } from "@/components/domain/PreMeetingDiagnosisPanel";
+import { AudioRecorderPanel } from "@/components/domain/AudioRecorderPanel";
 
 export default function MeetingDetailPage() {
   const params = useParams();
@@ -156,6 +158,9 @@ export default function MeetingDetailPage() {
           </div>
 
           <div className="space-y-4">
+            <PreMeetingDiagnosisPanel meetingId={id} />
+            <AudioRecorderPanel meetingId={id} />
+
             <Card className="p-4">
               <h3 className="mb-3 font-medium text-text-primary">Details</h3>
               <div className="space-y-3 text-sm">

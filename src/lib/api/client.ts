@@ -447,6 +447,28 @@ export const aiAPI = {
     request<{ status: string }>(`/health`)
       .then(() => true)
       .catch(() => false),
+  preMeetingDiagnosis: (meetingId: string) =>
+    request<{
+      diagnosis: {
+        summary: string;
+        risk_level: string;
+        key_topics: string[];
+        talking_points: string[];
+        suggested_questions: string[];
+        historical_context: string;
+        preparation_checklist: string[];
+        employee_name: string;
+        manager_name: string;
+        incident_reference: string | null;
+        severity: string;
+        prior_incidents: number;
+        policy_aligned: boolean;
+        policy_sections: string[];
+      };
+    }>(`/ai/pre-meeting-diagnosis`, {
+      method: "POST",
+      body: JSON.stringify({ meeting_id: meetingId }),
+    }),
 };
 
 export const feedbackAPI = {
@@ -461,6 +483,101 @@ export const feedbackAPI = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+};
+
+// ---------------------------------------------------------------------------
+// HR Org Management
+// ---------------------------------------------------------------------------
+
+export interface OrgChartNode {
+  id: string;
+  name: string;
+  email: string;
+  job_title: string | null;
+  role: string;
+  status: string;
+  manager_id: string | null;
+  department_id: string | null;
+  children: OrgChartNode[];
+}
+
+export interface OrgChartStats {
+  total: number;
+  employees: number;
+  managers: number;
+  hrAgents: number;
+  companyAdmins: number;
+  maxDepth: number;
+}
+
+export interface OrgChartResponse {
+  tree: OrgChartNode[];
+  stats: OrgChartStats;
+}
+
+export interface BulkUploadRowResult {
+  line: number;
+  email: string;
+  success: boolean;
+  message: string;
+  user_id?: string;
+}
+
+export interface BulkUploadResponse {
+  total: number;
+  processed: number;
+  failed: number;
+  errors?: string[];
+  results: BulkUploadRowResult[];
+}
+
+export const hrAPI = {
+  getOrgChart: () => request<OrgChartResponse>(`/hr/org-chart`),
+  uploadData: (body: {
+    csv: string;
+  }) =>
+    request<BulkUploadResponse>(`/hr/upload-data`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+    }),
+  uploadDataFile: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return fetch(`/api/v1/hr/upload-data`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    }).then((r) => r.json()) as Promise<BulkUploadResponse>;
+  },
+};
+
+export interface NotificationResponse {
+  id: string;
+  company_id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+export const notificationsAPI = {
+  list: (params?: { limit?: number; offset?: number; unread?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.offset) qs.set("offset", String(params.offset));
+    if (params?.unread) qs.set("unread", "true");
+    return request<{ notifications: NotificationResponse[]; total: number }>(
+      `/notifications?${qs.toString()}`,
+    );
+  },
+  markRead: (id: string) =>
+    request<{ success: boolean }>(`/notifications/${id}`, { method: "PATCH" }),
 };
 
 // ---------------------------------------------------------------------------
@@ -733,5 +850,38 @@ export interface AIProxyResponse {
     latency_ms: number;
   };
 }
+
+export interface AuditLogEntry {
+  id: string;
+  company_id: string;
+  user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+  user: { name: string; email: string } | null;
+}
+
+export const auditLogAPI = {
+  list: (params?: {
+    entity_type?: string;
+    action?: string;
+    user_id?: string;
+    from_date?: string;
+    to_date?: string;
+    limit?: number;
+    cursor?: string;
+  }) =>
+    request<{ entries: AuditLogEntry[]; total: number; hasMore: boolean; nextCursor?: string }>(
+      `/audit-log?${new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
+        ) as Record<string, string>,
+      ).toString()}`,
+    ),
+};
 
 export { APIError };

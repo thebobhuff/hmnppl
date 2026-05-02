@@ -16,8 +16,21 @@ import { Select } from "@/components/ui/select";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { APIErrorFallback } from "@/components/domain/ErrorBoundary";
+import { BulkUploadModal } from "@/components/domain/BulkUploadModal";
+import { OrgChart, OrgChartSkeleton } from "@/components/domain/OrgChart";
+import {
+  hrAPI,
+  usersAPI,
+  type APIError,
+  type EmployeeImportResponse,
+  type EmployeeImportRow,
+  type OrgChartNode,
+  type OrgChartStats,
+  type UserResponse,
+} from "@/lib/api/client";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -33,14 +46,8 @@ import {
   Users,
   UserPlus,
   XCircle,
+  Network,
 } from "lucide-react";
-import {
-  usersAPI,
-  type APIError,
-  type EmployeeImportResponse,
-  type EmployeeImportRow,
-  type UserResponse,
-} from "@/lib/api/client";
 
 const ROLE_OPTIONS = [
   { value: "", label: "All Roles" },
@@ -82,8 +89,15 @@ export default function TeamPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"list" | "org">("list");
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orgLoading, setOrgLoading] = useState(false);
+  const [orgChart, setOrgChart] = useState<{
+    tree: OrgChartNode[];
+    stats: OrgChartStats;
+  } | null>(null);
   const [error, setError] = useState<APIError | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -114,9 +128,27 @@ export default function TeamPage() {
     }
   }, [roleFilter, statusFilter]);
 
+  const fetchOrgChart = useCallback(async () => {
+    setOrgLoading(true);
+    try {
+      const result = await hrAPI.getOrgChart();
+      setOrgChart(result);
+    } catch (err) {
+      console.error("Failed to load org chart:", err);
+    } finally {
+      setOrgLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    if (activeTab === "org" && !orgChart) {
+      void fetchOrgChart();
+    }
+  }, [activeTab, orgChart, fetchOrgChart]);
 
   const filteredUsers = useMemo(() => {
     if (!search) return users;
@@ -256,6 +288,10 @@ export default function TeamPage() {
             <Upload className="mr-2 h-4 w-4" />
             Import CSV
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Bulk Upload
+          </Button>
           <Button size="sm" onClick={() => setInviteModalOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Invite Member
@@ -292,148 +328,183 @@ export default function TeamPage() {
           />
         </div>
 
-        {/* Filters */}
-        <Card className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or email..."
-                className="pl-9"
-              />
-            </div>
-            <Select
-              value={roleFilter}
-              onValueChange={(v) => setRoleFilter(v)}
-              placeholder="Filter by role..."
-              options={ROLE_OPTIONS}
-              className="w-full sm:w-40"
-            />
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v)}
-              placeholder="Filter by status..."
-              options={STATUS_OPTIONS}
-              className="w-full sm:w-40"
-            />
-          </div>
-        </Card>
+        <div className="flex items-center justify-between gap-4">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as "list" | "org")}
+          >
+            <TabsList>
+              <TabsTrigger value="list">
+                <Users className="mr-2 h-4 w-4" />
+                Team List
+              </TabsTrigger>
+              <TabsTrigger value="org">
+                <Network className="mr-2 h-4 w-4" />
+                Org Chart
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-        {/* Error State */}
-        {error && (
-          <APIErrorFallback
-            error={error}
-            retry={fetchUsers}
-            message="Failed to load team members."
-          />
-        )}
-
-        {/* Loading State */}
-        {loading && !error && (
+        {activeTab === "org" && (
           <Card className="p-4">
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-14 w-full" />
-              ))}
-            </div>
+            {orgLoading ? (
+              <OrgChartSkeleton />
+            ) : orgChart ? (
+              <OrgChart tree={orgChart.tree} stats={orgChart.stats} />
+            ) : (
+              <OrgChartSkeleton />
+            )}
           </Card>
         )}
 
-        {/* User Table */}
-        {!loading && !error && filteredUsers.length === 0 && (
-          <Card className="p-6">
-            <EmptyState
-              title="No team members found"
-              description="Try adjusting your filters or invite a new member."
-              icon={<Users className="h-8 w-8" />}
-            />
-          </Card>
-        )}
+        {activeTab === "list" && (
+          <>
+            <Card className="p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  value={roleFilter}
+                  onValueChange={(v) => setRoleFilter(v)}
+                  placeholder="Filter by role..."
+                  options={ROLE_OPTIONS}
+                  className="w-full sm:w-40"
+                />
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v)}
+                  placeholder="Filter by status..."
+                  options={STATUS_OPTIONS}
+                  className="w-full sm:w-40"
+                />
+              </div>
+            </Card>
 
-        {!loading && !error && filteredUsers.length > 0 && (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-brand-slate-dark border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
-                      Employee
-                    </th>
-                    <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary sm:table-cell">
-                      Role
-                    </th>
-                    <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary md:table-cell">
-                      Department
-                    </th>
-                    <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary lg:table-cell">
-                      Hire Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-text-tertiary">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="transition-colors hover:bg-card-hover">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-slate-light text-xs font-semibold text-text-primary">
-                            {user.first_name[0]}
-                            {user.last_name[0]}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-text-primary">
-                              {user.first_name} {user.last_name}
-                            </p>
-                            <p className="truncate text-xs text-text-tertiary">
-                              {user.email}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden px-4 py-3 sm:table-cell">
-                        <span className="text-sm text-text-secondary">{user.role}</span>
-                      </td>
-                      <td className="hidden px-4 py-3 md:table-cell">
-                        <span className="text-sm text-text-secondary">
-                          {user.department_id ?? "—"}
-                        </span>
-                      </td>
-                      <td className="hidden px-4 py-3 lg:table-cell">
-                        <span className="text-sm text-text-tertiary">
-                          {user.hire_date ?? "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant={
-                            user.status === "active"
-                              ? "success"
-                              : user.status === "invited"
-                                ? "warning"
-                                : "default"
-                          }
-                        >
-                          {user.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button className="rounded p-1 text-text-tertiary hover:bg-brand-slate-light hover:text-text-primary">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
+            {error && (
+              <APIErrorFallback
+                error={error}
+                retry={fetchUsers}
+                message="Failed to load team members."
+              />
+            )}
+
+            {loading && !error && (
+              <Card className="p-4">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                </div>
+              </Card>
+            )}
+
+            {!loading && !error && filteredUsers.length === 0 && (
+              <Card className="p-6">
+                <EmptyState
+                  title="No team members found"
+                  description="Try adjusting your filters or invite a new member."
+                  icon={<Users className="h-8 w-8" />}
+                />
+              </Card>
+            )}
+
+            {!loading && !error && filteredUsers.length > 0 && (
+              <Card className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-brand-slate-dark border-b border-border">
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                          Employee
+                        </th>
+                        <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary sm:table-cell">
+                          Role
+                        </th>
+                        <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary md:table-cell">
+                          Department
+                        </th>
+                        <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary lg:table-cell">
+                          Hire Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filteredUsers.map((user) => (
+                        <tr
+                          key={user.id}
+                          className="transition-colors hover:bg-card-hover"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-slate-light text-xs font-semibold text-text-primary">
+                                {user.first_name[0]}
+                                {user.last_name[0]}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-text-primary">
+                                  {user.first_name} {user.last_name}
+                                </p>
+                                <p className="truncate text-xs text-text-tertiary">
+                                  {user.email}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden px-4 py-3 sm:table-cell">
+                            <span className="text-sm text-text-secondary">
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            <span className="text-sm text-text-secondary">
+                              {user.department_id ?? "—"}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 lg:table-cell">
+                            <span className="text-sm text-text-tertiary">
+                              {user.hire_date ?? "—"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              variant={
+                                user.status === "active"
+                                  ? "success"
+                                  : user.status === "invited"
+                                    ? "warning"
+                                    : "default"
+                              }
+                            >
+                              {user.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button className="rounded p-1 text-text-tertiary hover:bg-brand-slate-light hover:text-text-primary">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </>
         )}
       </div>
 
@@ -456,6 +527,12 @@ export default function TeamPage() {
         result={importResult}
         onFile={handleImportFile}
         onImport={handleImport}
+      />
+
+      <BulkUploadModal
+        open={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        onSuccess={fetchUsers}
       />
     </PageContainer>
   );

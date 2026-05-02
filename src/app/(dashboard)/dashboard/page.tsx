@@ -32,18 +32,19 @@ import {
 } from "@/lib/api/client";
 import { useAuthStore } from "@/stores/auth-store";
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
   Bot,
   Building2,
   Calendar,
-  CheckCircle2,
   Clock,
   FileCheck,
   FileText,
   Inbox,
   Loader2,
   PlusCircle,
+  ScrollText,
   Settings2,
   Shield,
   Sparkles,
@@ -108,23 +109,26 @@ function HRDashboard() {
   const [aiAttention, setAiAttention] = useState<IncidentResponse[]>([]);
   const [signatureQueue, setSignatureQueue] = useState<DisciplinaryActionResponse[]>([]);
   const [meetings, setMeetings] = useState<MeetingResponse[]>([]);
+  const [disciplinaryActions, setDisciplinaryActions] = useState<DisciplinaryActionResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     async function fetchData() {
       try {
-        const [reviewRes, aiRes, signatureRes, meetRes] = await Promise.all([
+        const [reviewRes, aiRes, signatureRes, meetRes, actionsRes] = await Promise.all([
           incidentsAPI.list({ status: "pending_hr_review", limit: "8" }),
           incidentsAPI.list({ status: "ai_evaluating", limit: "8" }),
           disciplinaryAPI.list("pending_signature", "", 8),
           meetingsAPI.list("scheduled", "", 8),
+          disciplinaryAPI.list(undefined, "", 20),
         ]);
         if (active) {
           setPendingReviews(reviewRes.incidents);
           setAiAttention(aiRes.incidents);
           setSignatureQueue(signatureRes.actions);
           setMeetings(meetRes.meetings);
+          setDisciplinaryActions(actionsRes.actions);
         }
       } catch (err) {
         console.error("Failed to load HR dashboard data", err);
@@ -138,10 +142,21 @@ function HRDashboard() {
     };
   }, []);
 
-  const meetingFollowUps = meetings.filter((meeting) => !meeting.ai_summary).slice(0, 4);
   const lowConfidenceReviews = [...pendingReviews, ...aiAttention]
     .filter((item) => (item.ai_confidence_score ?? 1) < 0.85)
     .slice(0, 4);
+
+  const pendingActions = disciplinaryActions.filter(
+    (a) => !["signed", "closed", "cancelled"].includes(a.status),
+  );
+  const actionByStatus = {
+    pending_signature: pendingActions.filter((a) => a.status === "pending_signature"),
+    in_meeting: pendingActions.filter((a) => a.status === "in_meeting" || a.status === "meeting_scheduled"),
+    hr_review: pendingActions.filter((a) => a.status === "pending_hr_review"),
+    other: pendingActions.filter(
+      (a) => !["pending_signature", "in_meeting", "meeting_scheduled", "pending_hr_review"].includes(a.status),
+    ),
+  };
 
   const stats = [
     {
@@ -152,11 +167,11 @@ function HRDashboard() {
       href: "/incident-queue?status=pending_hr_review",
     },
     {
-      label: "AI Evaluating",
-      value: aiAttention.length.toString(),
-      icon: <Bot className="h-5 w-5" />,
+      label: "Open Incidents",
+      value: (aiAttention.length + pendingReviews.length).toString(),
+      icon: <AlertTriangle className="h-5 w-5" />,
       color: "text-brand-warning",
-      href: "/incident-queue?status=ai_evaluating",
+      href: "/incident-queue",
     },
     {
       label: "Meetings Today",
@@ -225,18 +240,16 @@ function HRDashboard() {
                     {item.reference_number || "INC-" + item.id.slice(0, 4)}
                   </p>
                   <p className="text-xs text-text-tertiary">
-                    {item.type} · {new Date(item.created_at).toLocaleDateString()}
+                    {item.severity} · {formatRelativeDate(item.created_at)}
                   </p>
                 </div>
-                {item.ai_confidence_score ? (
-                  <Badge
-                    variant={
-                      (item.ai_confidence_score ?? 0) >= 0.85 ? "success" : "warning"
-                    }
-                  >
-                    {Math.round(item.ai_confidence_score * 100)}%
-                  </Badge>
-                ) : null}
+                <Badge
+                  variant={
+                    item.severity === "critical" ? "error" : item.severity === "high" ? "warning" : "default"
+                  }
+                >
+                  {item.severity}
+                </Badge>
               </Link>
             ))}
           </div>
@@ -244,11 +257,11 @@ function HRDashboard() {
 
         <Card className="p-4">
           <h3 className="mb-3 font-display text-base font-semibold text-text-primary">
-            AI Attention Queue
+            Needs Human Review
           </h3>
           <div className="space-y-2">
-            {aiAttention.length === 0 && lowConfidenceReviews.length === 0 && (
-              <p className="text-sm text-text-tertiary">No AI items need review right now.</p>
+            {lowConfidenceReviews.length === 0 && (
+              <p className="text-sm text-text-tertiary">All clear — no items need immediate review.</p>
             )}
             {lowConfidenceReviews.map((item) => (
               <Link
@@ -256,16 +269,16 @@ function HRDashboard() {
                 href={`/incident-queue/${item.id}/review`}
                 className="flex items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-card-hover"
               >
-                <Bot className="h-4 w-4 flex-shrink-0 text-brand-warning" />
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 text-brand-warning" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-text-primary">
                     {item.reference_number || item.type}
                   </p>
                   <p className="text-xs text-text-tertiary">
-                    Confidence {Math.round((item.ai_confidence_score ?? 0) * 100)}% · {item.type}
+                    {item.severity} · {formatRelativeDate(item.created_at)}
                   </p>
                 </div>
-                <Badge variant="warning">Needs human check</Badge>
+                <Badge variant="warning">Review</Badge>
               </Link>
             ))}
           </div>
@@ -274,40 +287,55 @@ function HRDashboard() {
         <Card className="p-4 lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-display text-base font-semibold text-text-primary">
-              Follow Up Today
+              Disciplinary Actions Overview
             </h3>
             <Button asChild size="sm" variant="outline">
-              <Link href="/meetings">View Meetings</Link>
+              <Link href="/documents">View All</Link>
             </Button>
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <TaskListCard
-              title="Meeting summaries pending"
-              empty="No scheduled meetings need notes or summaries."
-              items={meetingFollowUps.map((meeting) => ({
-                id: meeting.id,
-                href: "/meetings",
-                title: meeting.type || "Meeting",
-                subtitle: meeting.scheduled_at
-                  ? new Date(meeting.scheduled_at).toLocaleString()
-                  : "Schedule still being finalized",
-                badge: formatStatusLabel(meeting.status),
-                badgeVariant: meeting.status === "scheduled" ? "warning" : "outline",
-              }))}
-            />
-            <TaskListCard
-              title="Signature bottlenecks"
-              empty="No documents are waiting on signatures."
-              items={signatureQueue.slice(0, 4).map((action) => ({
-                id: action.id,
-                href: "/documents",
-                title: action.action_type || "Disciplinary document",
-                subtitle: `Created ${formatRelativeDate(action.created_at)}`,
-                badge: formatStatusLabel(action.status),
-                badgeVariant: "success",
-              }))}
-            />
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-text-primary">{actionByStatus.pending_signature.length}</p>
+              <p className="text-xs text-text-tertiary">Awaiting Signature</p>
+            </div>
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-text-primary">{actionByStatus.in_meeting.length}</p>
+              <p className="text-xs text-text-tertiary">In Meeting / Scheduled</p>
+            </div>
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-text-primary">{pendingReviews.length}</p>
+              <p className="text-xs text-text-tertiary">Pending HR Review</p>
+            </div>
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-text-primary">{actionByStatus.other.length}</p>
+              <p className="text-xs text-text-tertiary">Other Active</p>
+            </div>
           </div>
+
+          {actionByStatus.pending_signature.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-medium text-text-tertiary">Awaiting Signature</p>
+              <div className="space-y-2">
+                {actionByStatus.pending_signature.slice(0, 3).map((action) => (
+                  <Link
+                    key={action.id}
+                    href={`/documents/${action.id}/sign`}
+                    className="flex items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-card-hover"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-text-primary">
+                        {action.action_type?.replace(/_/g, " ") || "Disciplinary Action"}
+                      </p>
+                      <p className="text-xs text-text-tertiary">
+                        Created {formatRelativeDate(action.created_at)}
+                      </p>
+                    </div>
+                    <Badge variant="warning">Pending Signature</Badge>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         <QuickActionsPanel
@@ -393,7 +421,7 @@ function ManagerDashboard() {
     (report) => report.severity === "high" || report.severity === "critical",
   );
   const reportStages = [
-    { label: "AI Review", count: myReports.filter((r) => r.status === "ai_evaluating").length },
+    { label: "Awaiting Review", count: myReports.filter((r) => r.status === "ai_evaluating" || r.status === "pending_hr_review").length },
     {
       label: "HR Review",
       count: myReports.filter((r) => r.status === "pending_hr_review").length,
@@ -821,12 +849,6 @@ function CompanyAdminDashboard() {
           href="/policies"
         />
         <StatCard
-          icon={<Shield className="h-5 w-5" />}
-          label="AI Threshold"
-          value={`${Math.round((settings?.ai.confidenceThreshold ?? 0.85) * 100)}%`}
-          href="/settings"
-        />
-        <StatCard
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Open Incidents"
           value={openIncidents.length}
@@ -905,6 +927,10 @@ function CompanyAdminDashboard() {
           </div>
         </Card>
 
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <div />
         <AICostTracker monthlyBudget={settings?.ai.monthlyBudgetUsd} />
       </div>
 
@@ -925,15 +951,21 @@ function CompanyAdminDashboard() {
           },
           {
             href: "/settings",
-            label: "Tune AI configuration",
-            description: "Adjust confidence, disputes, and monthly budget.",
+            label: "Platform settings",
+            description: "Company profile, notifications, and AI configuration.",
             icon: <Settings2 className="h-4 w-4" />,
           },
           {
-            href: "/ai-performance",
-            label: "Inspect AI performance",
-            description: "See model quality, drift, and cost snapshots.",
-            icon: <Bot className="h-4 w-4" />,
+            href: "/audit-log",
+            label: "Audit log",
+            description: "Review system activity and compliance records.",
+            icon: <ScrollText className="h-4 w-4" />,
+          },
+          {
+            href: "/hr-kpis",
+            label: "HR KPIs",
+            description: "Incident trends, department health, and team metrics.",
+            icon: <Activity className="h-4 w-4" />,
           },
         ]}
       />
@@ -1030,14 +1062,14 @@ function SuperAdminDashboard() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-display text-xl font-semibold text-text-primary">
-              Operator workspace overview
+              Platform workspace overview
             </h2>
             <p className="mt-1 text-sm text-text-secondary">
               This view uses the live control surfaces available in the current workspace while platform-wide tenant aggregation is still being wired.
             </p>
           </div>
           <Badge variant={healthReady ? "success" : "warning"}>
-            {healthReady ? "AI routing healthy" : "AI routing degraded"}
+            {healthReady ? "Platform ready" : "Check services"}
           </Badge>
         </div>
       </Card>
